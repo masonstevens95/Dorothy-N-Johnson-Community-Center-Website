@@ -1,8 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import type { ActionState } from "@/app/admin/actions";
+import {
+  FieldError,
+  FormError,
+  SubmitButton,
+  fieldClass,
+} from "@/app/form-ui";
 
 export interface ProjectFormValues {
   id?: string;
@@ -11,23 +16,6 @@ export interface ProjectFormValues {
   description?: string | null;
   status?: "active" | "past";
 }
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="w-full rounded-lg bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-60"
-    >
-      {pending ? "Saving…" : label}
-    </button>
-  );
-}
-
-const fieldClass =
-  "mt-1 w-full rounded-lg border border-line bg-white px-3 py-3 text-base";
 
 export function ProjectForm({
   action,
@@ -44,11 +32,7 @@ export function ProjectForm({
     <form action={formAction} className="mt-6 space-y-5">
       {values.id ? <input type="hidden" name="id" value={values.id} /> : null}
 
-      {state.error ? (
-        <p role="alert" className="rounded-lg border border-line p-3 text-sm text-warn">
-          {state.error}
-        </p>
-      ) : null}
+      <FormError message={state.error} />
 
       <div>
         <label htmlFor="name" className="block text-sm font-medium">
@@ -61,9 +45,7 @@ export function ProjectForm({
           defaultValue={values.name ?? ""}
           className={fieldClass}
         />
-        {state.fieldErrors?.name ? (
-          <p className="mt-1 text-sm text-warn">{state.fieldErrors.name}</p>
-        ) : null}
+        <FieldError message={state.fieldErrors?.name} />
       </div>
 
       <div>
@@ -112,9 +94,7 @@ export function ProjectForm({
         <p className="mt-1 text-sm text-muted">
           Leave blank to generate one from the name.
         </p>
-        {state.fieldErrors?.slug ? (
-          <p className="mt-1 text-sm text-warn">{state.fieldErrors.slug}</p>
-        ) : null}
+        <FieldError message={state.fieldErrors?.slug} />
       </div>
 
       <SubmitButton label={submitLabel} />

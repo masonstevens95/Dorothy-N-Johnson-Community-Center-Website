@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { UnauthorizedError, requireAdmin } from "@/lib/auth-guard";
 import { ImageRejectedError, ingestImage } from "@/lib/images";
+import { readOptionalText } from "@/app/admin/form-helpers";
 
 /**
  * The maintainer's upload path. Behind the write gate (R13).
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
 
   try {
     const image = await ingestImage(file, {
-      altText: readOptionalString(formData.get("altText")),
+      altText: readOptionalText(formData, "altText"),
     });
 
     return NextResponse.json({
@@ -46,12 +47,6 @@ export async function POST(request: Request) {
     }
     throw error;
   }
-}
-
-function readOptionalString(value: FormDataEntryValue | null): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
 }
 
 // sharp needs the Node runtime; it does not run on the edge.

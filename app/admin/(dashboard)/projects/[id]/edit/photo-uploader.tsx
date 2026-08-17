@@ -1,23 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import type { ActionState } from "@/app/admin/actions";
 import { addProjectPhotoAction } from "@/app/admin/project-actions";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="mt-3 w-full rounded-lg border border-line px-4 py-3 text-base font-medium disabled:opacity-60"
-    >
-      {pending ? "Uploading…" : "Add photo"}
-    </button>
-  );
-}
+import { FormError, SubmitButton, fieldClass } from "@/app/form-ui";
 
 export function PhotoUploader({ projectId }: { projectId: string }) {
   const [state, formAction] = useActionState<ActionState, FormData>(
@@ -31,11 +17,9 @@ export function PhotoUploader({ projectId }: { projectId: string }) {
 
       {/* Upload failures surface here rather than silently producing a project
           with a missing photo. */}
-      {state.error ? (
-        <p role="alert" className="mb-3 rounded-lg border border-line p-3 text-sm text-warn">
-          {state.error}
-        </p>
-      ) : null}
+      <div className="mb-3">
+        <FormError message={state.error} />
+      </div>
 
       <label htmlFor="photo" className="block text-sm font-medium">
         Photo
@@ -57,14 +41,14 @@ export function PhotoUploader({ projectId }: { projectId: string }) {
         id="altText"
         name="altText"
         placeholder="Raised beds along the back fence"
-        className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-3 text-base"
+        className={fieldClass}
       />
       <p className="mt-1 text-sm text-muted">
         For visitors using a screen reader. Optional, but an empty description
         is better than a wrong one.
       </p>
 
-      <SubmitButton />
+      <SubmitButton label="Add photo" pendingLabel="Uploading…" variant="secondary" />
     </form>
   );
 }

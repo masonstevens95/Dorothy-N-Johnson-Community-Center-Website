@@ -1,25 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import { submitEventAction, type SubmitState } from "./actions";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="w-full rounded-lg bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-60"
-    >
-      {pending ? "Sending…" : "Send it in"}
-    </button>
-  );
-}
-
-const fieldClass =
-  "mt-1 w-full rounded-lg border border-line bg-white px-3 py-3 text-base";
+import {
+  FieldError,
+  FormError,
+  SubmitButton,
+  fieldClass,
+} from "@/app/form-ui";
 
 export function SubmissionForm() {
   const [state, formAction] = useActionState<SubmitState, FormData>(
@@ -42,11 +30,7 @@ export function SubmissionForm() {
 
   return (
     <form action={formAction} className="mt-6 space-y-5">
-      {state.error ? (
-        <p role="alert" className="rounded-lg border border-line p-3 text-sm text-warn">
-          {state.error}
-        </p>
-      ) : null}
+      <FormError message={state.error} />
 
       {/*
         Honeypot. Hidden from people and from screen readers, so anything that
@@ -70,9 +54,7 @@ export function SubmissionForm() {
           className={fieldClass}
           placeholder="Community watch meeting"
         />
-        {state.fieldErrors?.title ? (
-          <p className="mt-1 text-sm text-warn">{state.fieldErrors.title}</p>
-        ) : null}
+        <FieldError message={state.fieldErrors?.title} />
       </div>
 
       <div>
@@ -86,9 +68,7 @@ export function SubmissionForm() {
           required
           className={fieldClass}
         />
-        {state.fieldErrors?.startsAt ? (
-          <p className="mt-1 text-sm text-warn">{state.fieldErrors.startsAt}</p>
-        ) : null}
+        <FieldError message={state.fieldErrors?.startsAt} />
       </div>
 
       <div>
@@ -107,9 +87,7 @@ export function SubmissionForm() {
           capture="environment"
           className="mt-2 w-full text-sm"
         />
-        {state.fieldErrors?.photo ? (
-          <p className="mt-1 text-sm text-warn">{state.fieldErrors.photo}</p>
-        ) : null}
+        <FieldError message={state.fieldErrors?.photo} />
       </div>
 
       <div>
@@ -144,7 +122,7 @@ export function SubmissionForm() {
         </p>
       </div>
 
-      <SubmitButton />
+      <SubmitButton label="Send it in" pendingLabel="Sending…" />
     </form>
   );
 }

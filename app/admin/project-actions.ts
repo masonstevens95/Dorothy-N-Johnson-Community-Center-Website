@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import {
   addProjectImage,
   createProject,
@@ -10,16 +9,15 @@ import {
   removeProjectImage,
   updateProject,
 } from "@/lib/projects/state";
-import { ImageRejectedError, ingestImage } from "@/lib/images";
-import type { ActionState } from "./actions";
+import { ingestImage } from "@/lib/images";
+import {
+  readOptionalText,
+  toActionState,
+  type ActionState,
+} from "./form-helpers";
 
 function readForm(formData: FormData) {
-  const text = (key: string) => {
-    const value = formData.get(key);
-    return typeof value === "string" && value.trim().length > 0
-      ? value.trim()
-      : null;
-  };
+  const text = (key: string) => readOptionalText(formData, key);
 
   return {
     name: (formData.get("name") as string | null) ?? "",
@@ -27,25 +25,6 @@ function readForm(formData: FormData) {
     description: text("description"),
     status: (text("status") ?? "active") as "active" | "past",
   };
-}
-
-function toActionState(error: unknown): ActionState {
-  if (error instanceof z.ZodError) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of error.issues) {
-      const key = issue.path[0];
-      if (typeof key === "string" && !fieldErrors[key]) {
-        fieldErrors[key] = issue.message;
-      }
-    }
-    return { error: "Please fix the highlighted fields.", fieldErrors };
-  }
-
-  if (error instanceof ImageRejectedError) {
-    return { error: error.message, fieldErrors: { photo: error.message } };
-  }
-
-  throw error;
 }
 
 export async function createProjectAction(
@@ -103,9 +82,8 @@ export async function addProjectPhotoAction(
   }
 
   try {
-    const altText = formData.get("altText");
     const image = await ingestImage(file, {
-      altText: typeof altText === "string" && altText.trim() ? altText.trim() : null,
+      altText: readOptionalText(formData, "altText"),
       keyPrefix: "projects",
     });
 

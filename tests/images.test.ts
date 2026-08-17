@@ -15,6 +15,7 @@ import {
   setupTestDatabase,
   truncateAll,
 } from "./helpers/db";
+import { makeJpegWithGps, noise } from "./helpers/fixtures";
 
 beforeAll(async () => {
   await setupTestDatabase();
@@ -28,35 +29,6 @@ afterAll(async () => {
   await closeTestDatabase();
 });
 
-type ExifInput = Parameters<ReturnType<typeof sharp>["withExif"]>[0];
-
-/** A noisy image, because flat colour compresses to almost nothing. */
-function noise(width: number, height: number) {
-  const channels = 3;
-  const pixels = Buffer.alloc(width * height * channels);
-  for (let i = 0; i < pixels.length; i++) {
-    pixels[i] = (i * 2654435761) % 256;
-  }
-  return sharp(pixels, { raw: { width, height, channels } });
-}
-
-async function jpegWithGps(width = 2400, height = 1800): Promise<Buffer> {
-  return noise(width, height)
-    // sharp's Exif type only names the standard IFDs; GPS is written through
-    // just fine, which is precisely why the pipeline has to remove it.
-    .withExif({
-      IFD0: { Make: "TestPhone", Model: "TestCam" },
-      GPS: {
-        GPSLatitudeRef: "N",
-        GPSLatitude: "42/1 19/1 3/1",
-        GPSLongitudeRef: "W",
-        GPSLongitude: "85/1 40/1 12/1",
-      },
-    } as ExifInput)
-    .jpeg({ quality: 90 })
-    .toBuffer();
-}
-
 describe("processImage", () => {
   it("downscales a large photo to within the dimension cap", async () => {
     const original = await noise(3200, 2400).jpeg().toBuffer();
@@ -69,7 +41,7 @@ describe("processImage", () => {
   });
 
   it("strips EXIF, including GPS coordinates", async () => {
-    const original = await jpegWithGps();
+    const original = await makeJpegWithGps();
 
     // The fixture really does carry the coordinates we expect to lose.
     const before = await sharp(original).metadata();
@@ -161,7 +133,7 @@ describe("processImage", () => {
 
 describe("ingestImage", () => {
   it("stores processed bytes and records their true dimensions", async () => {
-    const original = await jpegWithGps(2400, 1800);
+    const original = await makeJpegWithGps(2400, 1800);
     const file = new File([new Uint8Array(original)], "flyer.jpg", {
       type: "image/jpeg",
     });
@@ -209,7 +181,7 @@ describe("ingestImage", () => {
     // U8's public form and the maintainer's route share this function, so the
     // caps and EXIF stripping cannot diverge between trusted and untrusted
     // callers.
-    const original = await jpegWithGps(2400, 1800);
+    const original = await makeJpegWithGps(2400, 1800);
 
     const maintainerUpload = await ingestImage(
       new File([new Uint8Array(original)], "flyer.jpg", { type: "image/jpeg" }),

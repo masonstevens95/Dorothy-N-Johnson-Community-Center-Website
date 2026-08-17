@@ -1,5 +1,6 @@
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { db, sql } from "@/lib/db";
+import { truncatableTableList } from "@/lib/db/tables";
 
 /**
  * tests/setup.ts has already repointed DATABASE_URL at TEST_DATABASE_URL and
@@ -21,20 +22,9 @@ export async function setupTestDatabase(): Promise<void> {
  * other's fixtures. The migrations table is deliberately left alone.
  */
 export async function truncateAll(): Promise<void> {
-  await sql`
-    TRUNCATE TABLE
-      event_occurrence_exceptions,
-      events,
-      project_images,
-      projects,
-      images,
-      submission_attempts,
-      "session",
-      account,
-      verification,
-      "user"
-    RESTART IDENTITY CASCADE
-  `;
+  await sql.unsafe(
+    `TRUNCATE TABLE ${truncatableTableList} RESTART IDENTITY CASCADE`,
+  );
 }
 
 /** Vitest hangs on an open pool, so every suite closes its connection. */

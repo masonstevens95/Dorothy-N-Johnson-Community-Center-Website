@@ -1,7 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { seedAdmin } from "@/lib/auth-seed";
 import { UnauthorizedError } from "@/lib/auth-guard";
 import {
   cancelOccurrence,
@@ -22,9 +20,7 @@ import {
   setupTestDatabase,
   truncateAll,
 } from "./helpers/db";
-
-const ADMIN_EMAIL = "maintainer@example.test";
-const ADMIN_PASSWORD = "correct-horse-battery-staple";
+import { noSession, seedAndSignIn } from "./helpers/auth";
 
 let adminHeaders: Headers;
 
@@ -34,15 +30,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await truncateAll();
-  await seedAdmin({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
-
-  const response = await auth.api.signInEmail({
-    body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
-    asResponse: true,
-  });
-
-  adminHeaders = new Headers();
-  adminHeaders.set("cookie", response.headers.get("set-cookie")!.split(";")[0]);
+  adminHeaders = await seedAndSignIn();
 });
 
 afterAll(async () => {
@@ -395,7 +383,7 @@ describe("occurrence exceptions", () => {
 });
 
 describe("every authoring path is behind the write gate (R13)", () => {
-  const unauthenticated = { requestHeaders: new Headers() };
+  const unauthenticated = noSession();
 
   it("refuses to create", async () => {
     await expect(

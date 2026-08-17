@@ -1,7 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { seedAdmin } from "@/lib/auth-seed";
 import { UnauthorizedError } from "@/lib/auth-guard";
 import {
   addProjectImage,
@@ -17,18 +15,15 @@ import {
   getPublicProjects,
 } from "@/lib/projects/public-data";
 import { createEvent } from "@/lib/events/state";
-import { ingestImage } from "@/lib/images";
 import { events, images, projects } from "@/lib/db/schema";
-import sharp from "sharp";
 import {
   closeTestDatabase,
   db,
   setupTestDatabase,
   truncateAll,
 } from "./helpers/db";
-
-const ADMIN_EMAIL = "maintainer@example.test";
-const ADMIN_PASSWORD = "correct-horse-battery-staple";
+import { noSession, seedAndSignIn } from "./helpers/auth";
+import { makeStoredImage } from "./helpers/fixtures";
 
 let adminHeaders: Headers;
 
@@ -38,15 +33,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await truncateAll();
-  await seedAdmin({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
-
-  const response = await auth.api.signInEmail({
-    body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
-    asResponse: true,
-  });
-
-  adminHeaders = new Headers();
-  adminHeaders.set("cookie", response.headers.get("set-cookie")!.split(";")[0]);
+  adminHeaders = await seedAndSignIn();
 });
 
 afterAll(async () => {
@@ -55,22 +42,6 @@ afterAll(async () => {
 
 const auth_ = () => ({ requestHeaders: adminHeaders });
 const inDays = (days: number) => new Date(Date.now() + days * 86_400_000);
-
-async function makePhoto() {
-  const width = 900;
-  const height = 700;
-  const pixels = Buffer.alloc(width * height * 3);
-  for (let i = 0; i < pixels.length; i++) pixels[i] = (i * 2654435761) % 256;
-
-  const jpeg = await sharp(pixels, { raw: { width, height, channels: 3 } })
-    .jpeg()
-    .toBuffer();
-
-  return ingestImage(
-    new File([new Uint8Array(jpeg)], "bed.jpg", { type: "image/jpeg" }),
-    { keyPrefix: "projects" },
-  );
-}
 
 describe("slugify", () => {
   it("makes a URL-safe slug from a name", () => {
@@ -217,8 +188,8 @@ describe("project photos", () => {
   it("attaches photos in the order they were added", async () => {
     const project = await createProject({ name: "Community garden" }, auth_());
 
-    const first = await makePhoto();
-    const second = await makePhoto();
+    const first = await makeStoredImage("projects");
+    const second = await makeStoredImage("projects");
 
     await addProjectImage(project.id, first.id, auth_());
     await addProjectImage(project.id, second.id, auth_());
@@ -232,7 +203,7 @@ describe("project photos", () => {
     // No gallery-specific upload path exists, so the caps and EXIF stripping
     // apply here exactly as they do to a flyer.
     const project = await createProject({ name: "Community garden" }, auth_());
-    const photo = await makePhoto();
+    const photo = await makeStoredImage("projects");
     await addProjectImage(project.id, photo.id, auth_());
 
     const [stored] = await db.select().from(images).where(eq(images.id, photo.id));
@@ -243,7 +214,7 @@ describe("project photos", () => {
 
   it("ignores a photo added twice", async () => {
     const project = await createProject({ name: "Community garden" }, auth_());
-    const photo = await makePhoto();
+    const photo = await makeStoredImage("projects");
 
     await addProjectImage(project.id, photo.id, auth_());
     await addProjectImage(project.id, photo.id, auth_());
@@ -254,7 +225,7 @@ describe("project photos", () => {
 
   it("removes a photo from a project", async () => {
     const project = await createProject({ name: "Community garden" }, auth_());
-    const photo = await makePhoto();
+    const photo = await makeStoredImage("projects");
 
     await addProjectImage(project.id, photo.id, auth_());
     await removeProjectImage(project.id, photo.id, auth_());
@@ -297,7 +268,7 @@ describe("project lookup", () => {
 });
 
 describe("project authoring is behind the write gate (R13)", () => {
-  const unauthenticated = { requestHeaders: new Headers() };
+  const unauthenticated = noSession();
 
   it("refuses to create, update, or delete", async () => {
     await expect(
@@ -320,7 +291,7 @@ describe("project authoring is behind the write gate (R13)", () => {
 
   it("refuses to add or remove photos", async () => {
     const project = await createProject({ name: "Real" }, auth_());
-    const photo = await makePhoto();
+    const photo = await makeStoredImage("projects");
 
     await expect(
       addProjectImage(project.id, photo.id, unauthenticated),

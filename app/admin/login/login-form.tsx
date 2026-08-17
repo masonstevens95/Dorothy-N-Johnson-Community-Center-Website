@@ -27,7 +27,9 @@ export function LoginForm() {
     // A full navigation rather than router.push: the session cookie is set by
     // the sign-in response, and a client-side transition can issue the request
     // for /admin before that cookie is committed, which bounces straight back
-    // to this page.
+    // to this page. This was an intermittent failure before the change, so the
+    // lint rule's advice is knowingly declined here.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign("/admin");
   }
 

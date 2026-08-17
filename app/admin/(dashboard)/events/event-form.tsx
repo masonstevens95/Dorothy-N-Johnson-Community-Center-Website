@@ -1,8 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import type { ActionState } from "@/app/admin/actions";
+import {
+  FieldError,
+  FormError,
+  SubmitButton,
+  fieldClass,
+} from "@/app/form-ui";
 
 export interface EventFormValues {
   id?: string;
@@ -32,23 +37,6 @@ interface EventFormProps {
   projects?: ProjectOption[];
 }
 
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="w-full rounded-lg bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-60"
-    >
-      {pending ? "Saving…" : label}
-    </button>
-  );
-}
-
-const fieldClass =
-  "mt-1 w-full rounded-lg border border-line bg-white px-3 py-3 text-base";
-
 export function EventForm({
   action,
   values = {},
@@ -64,11 +52,7 @@ export function EventForm({
         <input type="hidden" name="imageId" value={values.imageId} />
       ) : null}
 
-      {state.error ? (
-        <p role="alert" className="rounded-lg border border-line p-3 text-sm text-warn">
-          {state.error}
-        </p>
-      ) : null}
+      <FormError message={state.error} />
 
       {/* Only these two are required (R14). Everything below is optional so a
           post can be finished while standing at the board. */}
@@ -83,9 +67,7 @@ export function EventForm({
           defaultValue={values.title ?? ""}
           className={fieldClass}
         />
-        {state.fieldErrors?.title ? (
-          <p className="mt-1 text-sm text-warn">{state.fieldErrors.title}</p>
-        ) : null}
+        <FieldError message={state.fieldErrors?.title} />
       </div>
 
       <div>
@@ -100,9 +82,7 @@ export function EventForm({
           defaultValue={values.startsAt ?? ""}
           className={fieldClass}
         />
-        {state.fieldErrors?.startsAt ? (
-          <p className="mt-1 text-sm text-warn">{state.fieldErrors.startsAt}</p>
-        ) : null}
+        <FieldError message={state.fieldErrors?.startsAt} />
       </div>
 
       <details className="rounded-lg border border-line p-3">
@@ -135,9 +115,7 @@ export function EventForm({
               capture="environment"
               className="mt-2 w-full text-sm"
             />
-            {state.fieldErrors?.photo ? (
-              <p className="mt-1 text-sm text-warn">{state.fieldErrors.photo}</p>
-            ) : null}
+            <FieldError message={state.fieldErrors?.photo} />
           </div>
 
           <div>
@@ -151,9 +129,7 @@ export function EventForm({
               defaultValue={values.endsAt ?? ""}
               className={fieldClass}
             />
-            {state.fieldErrors?.endsAt ? (
-              <p className="mt-1 text-sm text-warn">{state.fieldErrors.endsAt}</p>
-            ) : null}
+            <FieldError message={state.fieldErrors?.endsAt} />
           </div>
 
           <div>

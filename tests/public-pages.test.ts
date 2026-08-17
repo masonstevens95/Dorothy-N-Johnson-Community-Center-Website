@@ -1,6 +1,4 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { auth } from "@/lib/auth";
-import { seedAdmin } from "@/lib/auth-seed";
 import { createEvent } from "@/lib/events/state";
 import {
   getPublicEvent,
@@ -17,14 +15,12 @@ import {
   setupTestDatabase,
   truncateAll,
 } from "./helpers/db";
+import { seedAndSignIn } from "./helpers/auth";
 
 /**
  * The public read path. Its two guarantees are that nothing unapproved is
  * reachable, and that what is shown carries an honest age.
  */
-
-const ADMIN_EMAIL = "maintainer@example.test";
-const ADMIN_PASSWORD = "correct-horse-battery-staple";
 
 let adminHeaders: Headers;
 
@@ -34,15 +30,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await truncateAll();
-  await seedAdmin({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
-
-  const response = await auth.api.signInEmail({
-    body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
-    asResponse: true,
-  });
-
-  adminHeaders = new Headers();
-  adminHeaders.set("cookie", response.headers.get("set-cookie")!.split(";")[0]);
+  adminHeaders = await seedAndSignIn();
 });
 
 afterAll(async () => {

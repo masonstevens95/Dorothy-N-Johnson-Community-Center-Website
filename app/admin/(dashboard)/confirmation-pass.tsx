@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
 import { confirmEventsAction } from "@/app/admin/actions";
+import { SubmitButton } from "@/app/form-ui";
 
 export interface ConfirmableEvent {
   id: string;
@@ -10,24 +10,6 @@ export interface ConfirmableEvent {
   when: string;
   confirmedLabel: string;
   stale: boolean;
-}
-
-function SubmitButton({ count }: { count: number }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      disabled={pending || count === 0}
-      className="w-full rounded-lg bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-40"
-    >
-      {pending
-        ? "Confirming…"
-        : count === 0
-          ? "Select events to confirm"
-          : `Confirm ${count} ${count === 1 ? "event" : "events"}`}
-    </button>
-  );
 }
 
 /**
@@ -105,7 +87,15 @@ export function ConfirmationPass({ events }: { events: ConfirmableEvent[] }) {
       </ul>
 
       <div className="sticky bottom-0 mt-4 bg-surface py-3">
-        <SubmitButton count={selected.size} />
+        <SubmitButton
+          label={
+            selected.size === 0
+              ? "Select events to confirm"
+              : `Confirm ${selected.size} ${selected.size === 1 ? "event" : "events"}`
+          }
+          pendingLabel="Confirming…"
+          disabled={selected.size === 0}
+        />
       </div>
     </form>
   );

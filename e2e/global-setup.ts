@@ -31,12 +31,10 @@ export default async function globalSetup() {
 
   await migrate(db, { migrationsFolder: "./drizzle" });
 
-  await sql`
-    TRUNCATE TABLE
-      event_occurrence_exceptions, events, project_images, projects, images,
-      submission_attempts, "session", account, verification, "user"
-    RESTART IDENTITY CASCADE
-  `;
+  const { truncatableTableList } = await import("../lib/db/tables");
+  await sql.unsafe(
+    `TRUNCATE TABLE ${truncatableTableList} RESTART IDENTITY CASCADE`,
+  );
 
   await seedAdmin({
     email: E2E_ADMIN_EMAIL,

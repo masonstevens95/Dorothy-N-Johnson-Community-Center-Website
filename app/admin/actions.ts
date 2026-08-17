@@ -2,15 +2,19 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import {
   confirmEvents,
   createEvent,
   deleteEvent,
   updateEvent,
 } from "@/lib/events/state";
-import { ImageRejectedError, ingestImage } from "@/lib/images";
+import { ingestImage } from "@/lib/images";
 import { parseZonedInput } from "@/lib/time";
+import {
+  readOptionalText,
+  toActionState,
+  type ActionState,
+} from "./form-helpers";
 
 /**
  * Server actions are thin. Authorization and the write itself live in
@@ -18,10 +22,7 @@ import { parseZonedInput } from "@/lib/time";
  * — there is no path here that writes directly.
  */
 
-export interface ActionState {
-  error?: string;
-  fieldErrors?: Record<string, string>;
-}
+export type { ActionState };
 
 /**
  * Reads the optional flyer photo and puts it through the ingest pipeline.
@@ -43,12 +44,7 @@ async function readImageId(formData: FormData): Promise<string | null> {
 }
 
 function readForm(formData: FormData, imageId: string | null) {
-  const text = (key: string) => {
-    const value = formData.get(key);
-    return typeof value === "string" && value.trim().length > 0
-      ? value.trim()
-      : null;
-  };
+  const text = (key: string) => readOptionalText(formData, key);
 
   // Date inputs carry wall-clock time with no zone. They are the times written
   // on the flyer, so they are read in the center's zone rather than the
@@ -75,25 +71,6 @@ function readForm(formData: FormData, imageId: string | null) {
       : null,
     recurrenceUntil: zoned("recurrenceUntil"),
   };
-}
-
-function toActionState(error: unknown): ActionState {
-  if (error instanceof z.ZodError) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of error.issues) {
-      const key = issue.path[0];
-      if (typeof key === "string" && !fieldErrors[key]) {
-        fieldErrors[key] = issue.message;
-      }
-    }
-    return { error: "Please fix the highlighted fields.", fieldErrors };
-  }
-
-  if (error instanceof ImageRejectedError) {
-    return { error: error.message, fieldErrors: { photo: error.message } };
-  }
-
-  throw error;
 }
 
 export async function createEventAction(

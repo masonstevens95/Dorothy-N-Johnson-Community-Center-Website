@@ -1,8 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import sharp from "sharp";
-import { auth } from "@/lib/auth";
-import { seedAdmin } from "@/lib/auth-seed";
 import { UnauthorizedError } from "@/lib/auth-guard";
 import {
   RateLimitedError,
@@ -24,9 +21,8 @@ import {
   setupTestDatabase,
   truncateAll,
 } from "./helpers/db";
-
-const ADMIN_EMAIL = "maintainer@example.test";
-const ADMIN_PASSWORD = "correct-horse-battery-staple";
+import { noSession, seedAndSignIn } from "./helpers/auth";
+import { asUpload, makeJpegWithGps } from "./helpers/fixtures";
 
 let adminHeaders: Headers;
 
@@ -36,15 +32,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await truncateAll();
-  await seedAdmin({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
-
-  const response = await auth.api.signInEmail({
-    body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
-    asResponse: true,
-  });
-
-  adminHeaders = new Headers();
-  adminHeaders.set("cookie", response.headers.get("set-cookie")!.split(";")[0]);
+  adminHeaders = await seedAndSignIn();
 });
 
 afterAll(async () => {
@@ -64,23 +52,6 @@ function submission(overrides: Record<string, unknown> = {}) {
   return { title: "Community watch meeting", startsAt: soon(), ...overrides };
 }
 
-async function flyerFile() {
-  const width = 1200;
-  const height = 1600;
-  const pixels = Buffer.alloc(width * height * 3);
-  for (let i = 0; i < pixels.length; i++) pixels[i] = (i * 2654435761) % 256;
-
-  const jpeg = await sharp(pixels, { raw: { width, height, channels: 3 } })
-    .withExif({
-      IFD0: { Make: "TestPhone" },
-      GPS: { GPSLatitudeRef: "N", GPSLatitude: "42/1 19/1 3/1" },
-    } as Parameters<ReturnType<typeof sharp>["withExif"]>[0])
-    .jpeg()
-    .toBuffer();
-
-  return new File([new Uint8Array(jpeg)], "flyer.jpg", { type: "image/jpeg" });
-}
-
 describe("submitting without an account (R17)", () => {
   it("accepts a submission and files it as pending", async () => {
     const { accepted, event } = await submitEvent(submission(), {
@@ -97,7 +68,7 @@ describe("submitting without an account (R17)", () => {
   it("accepts a name, a date, and a flyer photo alone", async () => {
     const { event } = await submitEvent(submission({ description: "" }), {
       clientIp: "203.0.113.11",
-      photo: await flyerFile(),
+      photo: asUpload(await makeJpegWithGps(1200, 1600)),
     });
 
     expect(event!.imageId).not.toBeNull();
@@ -292,7 +263,7 @@ describe("submitted photos go through the same ingest path (U4)", () => {
   it("strips EXIF from an untrusted upload exactly as from a maintainer's", async () => {
     const { event } = await submitEvent(submission(), {
       clientIp: "203.0.113.60",
-      photo: await flyerFile(),
+      photo: asUpload(await makeJpegWithGps(1200, 1600)),
     });
 
     const [image] = await db
@@ -332,7 +303,7 @@ describe("submitted photos go through the same ingest path (U4)", () => {
 });
 
 describe("moderation is behind the write gate (R13)", () => {
-  const unauthenticated = { requestHeaders: new Headers() };
+  const unauthenticated = noSession();
 
   it("refuses to approve or reject without a session", async () => {
     const { event } = await submitEvent(submission(), { clientIp: "203.0.113.70" });

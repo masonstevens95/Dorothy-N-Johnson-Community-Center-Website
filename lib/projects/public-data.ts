@@ -42,25 +42,47 @@ async function loadProjectImages(projectId: string): Promise<Image[]> {
  * Filtered to published like every other public read — a pending submission
  * attached to a project must not surface on the project page either.
  */
-async function upcomingForProject(projectId: string, now: Date) {
-  const projectEvents = await db
-    .select()
-    .from(events)
-    .where(eq(events.state, "published"))
-    .orderBy(asc(events.startsAt));
+type UpcomingByProject = Map<string, ProjectDetail["upcoming"]>;
 
-  const mine = projectEvents.filter((event) => event.projectId === projectId);
-  if (mine.length === 0) return [];
+/**
+ * Every project's upcoming occurrences, in two queries total.
+ *
+ * Loading per project meant re-reading every published event and every
+ * exception once per project — the gallery's cost grew with the square of the
+ * content. Expanding once and grouping keeps it linear.
+ */
+async function loadUpcomingByProject(now: Date): Promise<UpcomingByProject> {
+  const publishedWithProject = (
+    await db
+      .select()
+      .from(events)
+      .where(eq(events.state, "published"))
+      .orderBy(asc(events.startsAt))
+  ).filter((event) => event.projectId !== null);
+
+  const byProject: UpcomingByProject = new Map();
+  if (publishedWithProject.length === 0) return byProject;
 
   const exceptions = await db.query.eventOccurrenceExceptions.findMany();
 
-  return expandEvents(mine, exceptions, {
+  const occurrences = expandEvents(publishedWithProject, exceptions, {
     from: startOfZonedDay(now),
     to: addZonedDays(now, 120),
-  }).map((occurrence) => ({
-    occurrence,
-    freshness: freshnessOf(occurrence.event.lastConfirmedAt, now),
-  }));
+  });
+
+  for (const occurrence of occurrences) {
+    const projectId = occurrence.event.projectId!;
+    const entry = {
+      occurrence,
+      freshness: freshnessOf(occurrence.event.lastConfirmedAt, now),
+    };
+
+    const existing = byProject.get(projectId);
+    if (existing) existing.push(entry);
+    else byProject.set(projectId, [entry]);
+  }
+
+  return byProject;
 }
 
 /**
@@ -79,16 +101,13 @@ export async function getPublicProjects(
     .leftJoin(images, eq(projects.coverImageId, images.id))
     .orderBy(asc(projects.name));
 
-  const summaries: ProjectSummary[] = [];
+  const upcomingByProject = await loadUpcomingByProject(now);
 
-  for (const row of rows) {
-    const upcoming = await upcomingForProject(row.project.id, now);
-    summaries.push({
-      project: row.project,
-      coverImage: row.coverImage ?? null,
-      upcomingCount: upcoming.length,
-    });
-  }
+  const summaries: ProjectSummary[] = rows.map((row) => ({
+    project: row.project,
+    coverImage: row.coverImage ?? null,
+    upcomingCount: upcomingByProject.get(row.project.id)?.length ?? 0,
+  }));
 
   return summaries.sort((a, b) => {
     if (a.project.status !== b.project.status) {
@@ -110,10 +129,15 @@ export async function getPublicProject(
 
   if (!project) return null;
 
+  const [projectImageList, upcomingByProject] = await Promise.all([
+    loadProjectImages(project.id),
+    loadUpcomingByProject(now),
+  ]);
+
   return {
     project,
-    images: await loadProjectImages(project.id),
-    upcoming: await upcomingForProject(project.id, now),
+    images: projectImageList,
+    upcoming: upcomingByProject.get(project.id) ?? [],
   };
 }
 
