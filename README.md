@@ -125,7 +125,15 @@ accounts, plus this repository.
 
 ## Before going public
 
-Two questions are deliberately unresolved and block launch, not development:
+Set the site-identity variables. `NEXT_PUBLIC_CENTER_ADDRESS`,
+`NEXT_PUBLIC_CENTER_HOURS`, and `NEXT_PUBLIC_OFFICIAL_URL` ship empty, and the
+footer omits each block while its value is blank — so the address, the hours,
+and the link to the city's page are simply absent until they are filled in.
+Also set `NEXT_PUBLIC_SITE_TIME_ZONE` to the center's actual timezone, or every
+displayed time and every repeating program will be an offset out.
+
+Two further questions are deliberately unresolved and block launch, not
+development:
 
 - Does anyone at the center — staff, a director, the board — know that a public
   site carrying the center's name is going up? Blessing to build is not

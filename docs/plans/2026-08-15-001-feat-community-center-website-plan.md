@@ -1,7 +1,7 @@
 ---
 title: "feat: Community center calendar, gallery, and submission queue"
 type: feat
-status: active
+status: completed
 date: 2026-08-15
 origin: docs/brainstorms/2026-08-15-community-center-website-requirements.md
 ---
