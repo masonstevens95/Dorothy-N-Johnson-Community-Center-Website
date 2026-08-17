@@ -46,13 +46,16 @@ cp .env.example .env.local   # then fill in the values
 Start a local Postgres:
 
 ```bash
-docker run -d --name dnj-postgres \
-  -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=dnj_dev \
-  -p 5433:5432 postgres:16-alpine
+brew install postgresql@17
+brew services start postgresql@17
 
-# the test suite truncates tables, so it gets its own database
-docker exec dnj-postgres psql -U postgres -c 'CREATE DATABASE dnj_test;'
+createdb dnj_dev
+createdb dnj_test   # the test suite truncates tables, so it gets its own
 ```
+
+The test suite refuses to run if `TEST_DATABASE_URL` is unset or equal to
+`DATABASE_URL` — it truncates tables, and pointing it at real content would
+destroy it silently.
 
 Apply migrations and create the one admin account:
 
@@ -77,6 +80,11 @@ account comes into existence.
 | `pnpm db:generate` | Generate a migration from schema changes |
 | `pnpm db:migrate` | Apply pending migrations |
 | `pnpm seed:admin` | Create or update the single admin account |
+
+Migrations are forward-only — `drizzle-kit generate` does not emit `down` SQL.
+Rolling one back means writing the reversing SQL by hand, or, for the initial
+migration, dropping the schema and reapplying. At this project's size that is
+the honest trade rather than maintaining paired migrations nobody runs.
 
 ## Deploying
 
