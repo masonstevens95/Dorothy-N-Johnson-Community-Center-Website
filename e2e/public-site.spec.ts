@@ -97,6 +97,22 @@ test.describe("as a signed-out visitor", () => {
     ).toBeVisible();
   });
 
+  test("the upload endpoint refuses an unauthenticated post", async ({ request }) => {
+    // Storage is the resource that can take this site offline by being filled,
+    // so the upload path must reject before it processes anything.
+    const response = await request.post("/api/upload", {
+      multipart: {
+        file: {
+          name: "flyer.jpg",
+          mimeType: "image/jpeg",
+          buffer: Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43]),
+        },
+      },
+    });
+
+    expect(response.status()).toBe(401);
+  });
+
   test("a made-up event id is not found rather than revealing anything", async ({
     page,
   }) => {

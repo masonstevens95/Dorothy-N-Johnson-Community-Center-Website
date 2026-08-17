@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { z } from "zod";
+import { UnauthorizedError, requireAdmin } from "@/lib/auth-guard";
 import { ImageRejectedError } from "@/lib/images";
 
 /**
@@ -13,6 +15,31 @@ import { ImageRejectedError } from "@/lib/images";
 export interface ActionState {
   error?: string;
   fieldErrors?: Record<string, string>;
+}
+
+/**
+ * Gates a server action before it does any work.
+ *
+ * Server actions are ordinary POST endpoints — reachable by anyone who knows
+ * the action id, whether or not the UI that calls them was ever rendered. That
+ * matters most for actions that ingest an image: the gate inside
+ * lib/events/state.ts runs *after* the upload has already been processed and
+ * stored, so an unauthenticated caller could consume blob storage and leave
+ * orphaned image rows before being turned away. Calling this first closes
+ * that window.
+ *
+ * An expired session redirects to the login page rather than surfacing an
+ * error, because that is the maintainer's likely case.
+ */
+export async function requireAdminAction(): Promise<void> {
+  try {
+    await requireAdmin();
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      redirect("/admin/login");
+    }
+    throw error;
+  }
 }
 
 /** Trimmed field value, or null when absent or empty. */

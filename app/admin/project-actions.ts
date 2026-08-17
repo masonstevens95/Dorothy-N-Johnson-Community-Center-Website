@@ -12,6 +12,7 @@ import {
 import { ingestImage } from "@/lib/images";
 import {
   readOptionalText,
+  requireAdminAction,
   toActionState,
   type ActionState,
 } from "./form-helpers";
@@ -70,6 +71,9 @@ export async function addProjectPhotoAction(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  // Before the upload is processed — see the note in form-helpers.ts.
+  await requireAdminAction();
+
   const id = formData.get("id");
   const file = formData.get("photo");
 

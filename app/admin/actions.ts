@@ -12,14 +12,19 @@ import { ingestImage } from "@/lib/images";
 import { parseZonedInput } from "@/lib/time";
 import {
   readOptionalText,
+  requireAdminAction,
   toActionState,
   type ActionState,
 } from "./form-helpers";
 
 /**
- * Server actions are thin. Authorization and the write itself live in
- * lib/events/state.ts, so an action cannot accidentally ship without the gate
- * — there is no path here that writes directly.
+ * Server actions are thin: the write and its authorization both live in
+ * lib/events/state.ts.
+ *
+ * Any action that ingests an image must *also* gate up front. Ingest writes to
+ * storage before the state module's gate is reached, and a server action is a
+ * public POST endpoint, so without the early check an unauthenticated caller
+ * could fill blob storage and be rejected only afterwards.
  */
 
 export type { ActionState };
@@ -77,6 +82,9 @@ export async function createEventAction(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  // Before the upload is processed, not after.
+  await requireAdminAction();
+
   let id: string;
 
   try {
@@ -96,6 +104,8 @@ export async function updateEventAction(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireAdminAction();
+
   const id = formData.get("id");
 
   if (typeof id !== "string") {
