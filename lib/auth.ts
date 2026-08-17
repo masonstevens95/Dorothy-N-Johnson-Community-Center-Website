@@ -50,6 +50,14 @@ export const auth = betterAuth({
     },
   },
 
+  /**
+   * Better Auth's defaults are kept on purpose: in production, sign-in is
+   * limited to 3 attempts per 10 seconds per IP. With exactly one account and
+   * no lockout or reset flow, that throttle is the only thing standing between
+   * a password and an unattended brute-force attempt. Browser tests sign in
+   * once per run rather than weakening it.
+   */
+
   advanced: {
     cookiePrefix: "better-auth",
   },

@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { signIn } from "@/lib/auth-client";
 
 export function LoginForm() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +24,11 @@ export function LoginForm() {
       return;
     }
 
-    router.push("/admin");
-    router.refresh();
+    // A full navigation rather than router.push: the session cookie is set by
+    // the sign-in response, and a client-side transition can issue the request
+    // for /admin before that cookie is committed, which bounces straight back
+    // to this page.
+    window.location.assign("/admin");
   }
 
   return (
