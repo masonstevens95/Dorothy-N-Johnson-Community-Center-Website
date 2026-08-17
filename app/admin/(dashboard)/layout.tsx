@@ -40,6 +40,9 @@ export default async function AdminLayout({
             <Link href="/admin/events/new" className="underline">
               New event
             </Link>
+            <Link href="/admin/projects" className="underline">
+              Projects
+            </Link>
             <Link href="/" className="underline">
               View site
             </Link>

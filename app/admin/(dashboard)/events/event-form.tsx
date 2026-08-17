@@ -14,15 +14,22 @@ export interface EventFormValues {
   host?: string | null;
   imageId?: string | null;
   imageUrl?: string | null;
+  projectId?: string | null;
   recurrenceFrequency?: "weekly" | "monthly" | null;
   recurrenceInterval?: number | null;
   recurrenceUntil?: string | null;
+}
+
+export interface ProjectOption {
+  id: string;
+  name: string;
 }
 
 interface EventFormProps {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   values?: EventFormValues;
   submitLabel: string;
+  projects?: ProjectOption[];
 }
 
 function SubmitButton({ label }: { label: string }) {
@@ -42,7 +49,12 @@ function SubmitButton({ label }: { label: string }) {
 const fieldClass =
   "mt-1 w-full rounded-lg border border-line bg-white px-3 py-3 text-base";
 
-export function EventForm({ action, values = {}, submitLabel }: EventFormProps) {
+export function EventForm({
+  action,
+  values = {},
+  submitLabel,
+  projects = [],
+}: EventFormProps) {
   const [state, formAction] = useActionState<ActionState, FormData>(action, {});
 
   return (
@@ -181,6 +193,31 @@ export function EventForm({ action, values = {}, submitLabel }: EventFormProps) 
               className={fieldClass}
             />
           </div>
+
+          {projects.length > 0 ? (
+            <div>
+              <label htmlFor="projectId" className="block text-sm font-medium">
+                Part of a project
+              </label>
+              <select
+                id="projectId"
+                name="projectId"
+                defaultValue={values.projectId ?? ""}
+                className={fieldClass}
+              >
+                <option value="">Not part of a project</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-sm text-muted">
+                The project page will list this event, and this event will link
+                back to it.
+              </p>
+            </div>
+          ) : null}
 
           <div>
             <label htmlFor="recurrenceFrequency" className="block text-sm font-medium">

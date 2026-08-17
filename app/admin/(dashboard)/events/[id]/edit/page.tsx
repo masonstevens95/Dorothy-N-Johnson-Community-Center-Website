@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { events, images } from "@/lib/db/schema";
 import { toZonedDateValue, toZonedInputValue } from "@/lib/time";
+import { getProjectOptions } from "@/lib/projects/public-data";
 import { deleteEventAction, updateEventAction } from "@/app/admin/actions";
 import { EventForm } from "../../event-form";
 
@@ -16,6 +17,8 @@ export default async function EditEventPage({
 }) {
   const { id } = await params;
   const { saved } = await searchParams;
+
+  const projects = await getProjectOptions();
 
   const [row] = await db
     .select({ event: events, image: images })
@@ -44,7 +47,9 @@ export default async function EditEventPage({
       <EventForm
         action={updateEventAction}
         submitLabel="Save changes"
+        projects={projects}
         values={{
+          projectId: event.projectId,
           id: event.id,
           title: event.title,
           startsAt: toZonedInputValue(event.startsAt),
