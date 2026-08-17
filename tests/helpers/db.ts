@@ -28,6 +28,7 @@ export async function truncateAll(): Promise<void> {
       project_images,
       projects,
       images,
+      submission_attempts,
       "session",
       account,
       verification,

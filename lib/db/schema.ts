@@ -330,6 +330,33 @@ export const eventOccurrenceExceptions = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Public submission rate limiting
+// ---------------------------------------------------------------------------
+
+/**
+ * One row per submission attempt, used to rate-limit the public form (R20).
+ *
+ * In the database rather than in memory because serverless instances are
+ * created and destroyed constantly — an in-process counter would reset on
+ * almost every request and enforce nothing.
+ *
+ * The address is stored as a salted hash. This site publishes community
+ * content and has no reason to hold visitors' IP addresses; the hash is enough
+ * to count repeat attempts and useless for anything else.
+ */
+export const submissionAttempts = pgTable(
+  "submission_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientHash: text("client_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("submission_attempts_lookup_idx").on(table.clientHash, table.createdAt),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Inferred types
 // ---------------------------------------------------------------------------
 

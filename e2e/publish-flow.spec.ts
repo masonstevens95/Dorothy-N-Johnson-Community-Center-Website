@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD } from "./global-setup";
 
 /**
  * The flow this site exists to support: the maintainer is standing at the
@@ -116,11 +117,28 @@ test("a published event carries a confirmation date immediately", async ({
   await expect(row).toContainText("Confirmed today");
 });
 
-test("signing out closes the admin surfaces again", async ({ page }) => {
-  await page.goto("/admin");
+test("signing out closes the admin surfaces again", async ({ browser, baseURL }) => {
+  // Signs in for itself rather than using the shared session. Signing out
+  // invalidates the token server-side, and the shared storageState carries
+  // that same token — using it here would break every test that runs after
+  // this one.
+  const context = await browser.newContext({
+    baseURL,
+    storageState: { cookies: [], origins: [] },
+  });
+  const page = await context.newPage();
+
+  await page.goto("/admin/login");
+  await page.getByLabel("Email").fill(E2E_ADMIN_EMAIL);
+  await page.getByLabel("Password").fill(E2E_ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/admin\/login/);
 
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/login/);
+
+  await context.close();
 });

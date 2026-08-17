@@ -34,7 +34,7 @@ export default async function globalSetup() {
   await sql`
     TRUNCATE TABLE
       event_occurrence_exceptions, events, project_images, projects, images,
-      "session", account, verification, "user"
+      submission_attempts, "session", account, verification, "user"
     RESTART IDENTITY CASCADE
   `;
 

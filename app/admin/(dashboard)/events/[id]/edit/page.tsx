@@ -6,6 +6,10 @@ import { events, images } from "@/lib/db/schema";
 import { toZonedDateValue, toZonedInputValue } from "@/lib/time";
 import { getProjectOptions } from "@/lib/projects/public-data";
 import { deleteEventAction, updateEventAction } from "@/app/admin/actions";
+import {
+  approveSubmissionAction,
+  rejectSubmissionAction,
+} from "@/app/admin/queue-actions";
 import { EventForm } from "../../event-form";
 
 export default async function EditEventPage({
@@ -66,6 +70,38 @@ export default async function EditEventPage({
             : "",
         }}
       />
+
+      {/*
+        AE6. A submission corrected here is approved from here, so "edit then
+        approve" is the ordinary edit form plus one button rather than a second
+        editor that could drift from this one.
+      */}
+      {event.state === "pending" ? (
+        <div className="mt-8 rounded-lg border border-line bg-white p-4">
+          <p className="text-sm font-medium">This is a submitted event.</p>
+          <p className="mt-1 text-sm text-muted">
+            It is not visible on the site. Save any corrections first, then
+            approve.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <form action={approveSubmissionAction}>
+              <input type="hidden" name="id" value={event.id} />
+              <button
+                type="submit"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white"
+              >
+                Approve and publish
+              </button>
+            </form>
+            <form action={rejectSubmissionAction}>
+              <input type="hidden" name="id" value={event.id} />
+              <button type="submit" className="text-sm text-warn underline">
+                Reject
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       <form action={deleteEventAction} className="mt-10 border-t border-line pt-6">
         <input type="hidden" name="id" value={event.id} />

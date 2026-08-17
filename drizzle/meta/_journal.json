@@ -8,6 +8,13 @@
       "when": 1786970356518,
       "tag": "0000_worthless_talisman",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786975520047,
+      "tag": "0001_uneven_infant_terrible",
+      "breakpoints": true
     }
   ]
 }
