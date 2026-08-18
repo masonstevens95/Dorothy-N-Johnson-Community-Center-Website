@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_TIME_ZONE,
   addZonedDays,
   addZonedMonths,
   parseZonedInput,
+  resolveTimeZone,
   startOfZonedDay,
   toZonedDateValue,
   toZonedInputValue,
@@ -84,5 +86,40 @@ describe("calendar arithmetic", () => {
     const parts = toZonedParts(start, TZ);
     expect(parts.day).toBe(1);
     expect(parts.hour).toBe(0);
+  });
+});
+
+describe("resolveTimeZone", () => {
+  it("uses a configured zone", () => {
+    expect(resolveTimeZone("America/Chicago")).toBe("America/Chicago");
+  });
+
+  it("falls back when the variable is unset", () => {
+    expect(resolveTimeZone(undefined)).toBe(DEFAULT_TIME_ZONE);
+  });
+
+  it("treats a blank value as unset rather than passing it to Intl", () => {
+    // This is the case that broke a deploy: a hosting dashboard stores a
+    // variable added with an empty value as "", which `??` lets through to
+    // Intl as an invalid zone.
+    expect(resolveTimeZone("")).toBe(DEFAULT_TIME_ZONE);
+    expect(resolveTimeZone("   ")).toBe(DEFAULT_TIME_ZONE);
+  });
+
+  it("tolerates surrounding whitespace on a real zone", () => {
+    expect(resolveTimeZone("  America/Denver  ")).toBe("America/Denver");
+  });
+
+  it("names the variable when the zone is unusable", () => {
+    // The bare RangeError from Intl says only "Invalid time zone specified:",
+    // which does not say where the value came from.
+    expect(() => resolveTimeZone("Springfield/Unknown")).toThrowError(
+      /NEXT_PUBLIC_SITE_TIME_ZONE/,
+    );
+  });
+
+  it("does not silently fall back on an unusable zone", () => {
+    // Falling back would publish a plausible calendar showing wrong hours.
+    expect(() => resolveTimeZone("EDT-5")).toThrow();
   });
 });
