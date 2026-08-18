@@ -10,8 +10,48 @@
  *
  * Set NEXT_PUBLIC_SITE_TIME_ZONE to the center's actual zone before launch.
  */
-export const SITE_TIME_ZONE =
-  process.env.NEXT_PUBLIC_SITE_TIME_ZONE ?? "America/New_York";
+
+export const DEFAULT_TIME_ZONE = "America/New_York";
+
+/**
+ * A blank value counts as unset, and an unusable one fails by name.
+ *
+ * `?? DEFAULT_TIME_ZONE` was not enough. Hosting dashboards store a variable
+ * added with an empty value as `""`, which passes a nullish check untouched
+ * and reaches Intl as an invalid zone. Every formatter in lib/format.ts is
+ * built at module scope, so the whole build died on
+ * `RangeError: Invalid time zone specified: ` — a message that never names the
+ * variable responsible, from a file that does not mention it.
+ *
+ * An unrecognized zone throws rather than falling back, because the fallback
+ * would be a plausible-looking calendar showing the wrong hour. Note that Intl
+ * does accept fixed-offset aliases like `EST`, which have no daylight saving —
+ * those pass this check and then drift by an hour for half the year, so the
+ * zone still has to be a real IANA name like `America/New_York`.
+ */
+export function resolveTimeZone(configured: string | undefined): string {
+  const zone = configured?.trim();
+
+  if (!zone) {
+    return DEFAULT_TIME_ZONE;
+  }
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+  } catch {
+    throw new Error(
+      `NEXT_PUBLIC_SITE_TIME_ZONE is not a time zone this runtime recognizes: ` +
+        `"${zone}". Use an IANA name such as "America/New_York", or leave it ` +
+        `unset to fall back to ${DEFAULT_TIME_ZONE}.`,
+    );
+  }
+
+  return zone;
+}
+
+export const SITE_TIME_ZONE = resolveTimeZone(
+  process.env.NEXT_PUBLIC_SITE_TIME_ZONE,
+);
 
 export interface ZonedParts {
   year: number;
