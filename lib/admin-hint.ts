@@ -59,17 +59,50 @@ function available(): boolean {
   return typeof document !== "undefined";
 }
 
+/**
+ * Nothing polls this cookie, so anything rendered from it has to be told when
+ * it changes. Every write below notifies, which is what makes signing out —
+ * or a summary request coming back 401 — take the maintainer's chrome away
+ * immediately rather than at the next full page load.
+ */
+const listeners = new Set<() => void>();
+
+export function subscribeToAdminHint(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function notify(): void {
+  for (const listener of listeners) listener();
+}
+
 /** Written on successful sign-in, and refreshed whenever the session answers. */
 export function setAdminHint(): void {
   if (!available()) return;
   document.cookie = `${ADMIN_HINT_COOKIE}=1; ${attributes(ADMIN_HINT_MAX_AGE_SECONDS)}`;
+  notify();
 }
 
 /** Written on sign-out, and whenever the server says the session is gone. */
 export function clearAdminHint(): void {
   if (!available()) return;
   document.cookie = `${ADMIN_HINT_COOKIE}=; ${attributes(0)}`;
+  notify();
 }
+
+/**
+ * The Set-Cookie value that expires the hint, for the one server-side caller
+ * that needs it (app/api/admin/summary/route.ts, on a 401).
+ *
+ * This is not the server reading the hint — it never does, and must not start.
+ * It is the server telling a browser to throw away a stale one, which is the
+ * belt to the client's braces: the hook clears the hint itself on a 401, and
+ * this covers the case where that JavaScript never gets to run. No Secure
+ * attribute, because removal matches on name, path, and domain only.
+ */
+export const EXPIRED_ADMIN_HINT_COOKIE = `${ADMIN_HINT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
 
 /**
  * Presence is the entire signal — the value carries nothing, so there is
