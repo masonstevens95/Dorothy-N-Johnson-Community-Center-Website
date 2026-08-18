@@ -144,6 +144,77 @@ test("reaches an event's edit form in one tap from a public page (R4)", async ({
   await expect(page.getByLabel("Event name")).toHaveValue(title);
 });
 
+test("reaches a project's edit form from the public gallery (R4)", async ({
+  page,
+}) => {
+  const stamp = Date.now();
+  const name = `Community garden ${stamp}`;
+  const slug = `garden-${stamp}`;
+
+  await page.goto("/admin/projects/new");
+  await page.getByLabel("Project name").fill(name);
+  await page.getByLabel("Web address").fill(slug);
+  await page.getByRole("button", { name: "Create project" }).click();
+  // Landing on the edit form is how this action reports success. Asserting it
+  // means a validation failure below reads as a validation failure rather than
+  // as a missing card on the gallery.
+  await expect(page).toHaveURL(/\/admin\/projects\/[0-9a-f-]{36}\/edit/);
+
+  /*
+   * The slug is set explicitly and asserted against, because the public route
+   * is keyed by slug while the admin edit route is keyed by id. They are
+   * different values for the same project, and a link built from the one
+   * already in scope on the card looks right and 404s. This test only catches
+   * that because the two genuinely differ.
+   */
+  await page.goto("/projects");
+  const card = page.locator("article").filter({ hasText: name });
+  await card.getByRole("link", { name: "Edit" }).click();
+
+  await expect(page).toHaveURL(/\/admin\/projects\/[0-9a-f-]{36}\/edit/);
+  await expect(page).not.toHaveURL(new RegExp(slug));
+  await expect(page.getByLabel("Project name")).toHaveValue(name);
+
+  // The detail page offers the same door onto the same form.
+  await page.goto(`/projects/${slug}`);
+  await page.getByRole("link", { name: "Edit" }).click();
+
+  await expect(page).toHaveURL(/\/admin\/projects\/[0-9a-f-]{36}\/edit/);
+  await expect(page.getByLabel("Project name")).toHaveValue(name);
+});
+
+test("offers contextual add shortcuts where they are relevant (R6)", async ({
+  page,
+}) => {
+  await page.goto("/projects");
+  await page.getByRole("link", { name: "Add project" }).click();
+  await expect(page).toHaveURL("/admin/projects/new");
+
+  await page.goto("/calendar");
+  await page.getByRole("link", { name: "Add event" }).click();
+  await expect(page).toHaveURL("/admin/events/new");
+});
+
+test("leaves the submission page alone even for the maintainer", async ({
+  page,
+}) => {
+  // R1/R17. /submit's entire job is telling a neighbor they need no account.
+  // Maintainer chrome on that page of all pages would be the exact misreading
+  // the rest of this design works to avoid, so it gets the shared header and
+  // nothing else.
+  await page.goto("/submit");
+
+  // The shared header strip is expected — it is on every page. What must not
+  // appear is anything in the page itself, so the assertions are scoped to
+  // <main> rather than to the document.
+  await expect(page.getByText("Maintainer view")).toBeVisible();
+
+  const body = page.locator("main");
+  await expect(body.getByRole("link", { name: /^Edit/ })).toHaveCount(0);
+  await expect(body.getByRole("link", { name: /^Add / })).toHaveCount(0);
+  await expect(body.getByRole("button", { name: /Confirm/ })).toHaveCount(0);
+});
+
 test("an event edited in admin keeps its identity", async ({ page }) => {
   await publishEvent(page, "Typo nite", 9);
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProjectSlugs, getPublicProject } from "@/lib/projects/public-data";
 import { formatEventWhen } from "@/lib/format";
+import { AdminControls } from "../../admin-controls";
 
 export async function generateStaticParams() {
   const slugs = await getProjectSlugs();
@@ -57,6 +58,12 @@ export default async function ProjectPage({
           {isActive ? "Active" : "Past"}
         </span>
       </div>
+
+      {/*
+        R4. Keyed by the project's id — this page is reached by slug, but the
+        edit form is not. See the same note on the card in ../page.tsx.
+      */}
+      <AdminControls editHref={`/admin/projects/${project.id}/edit`} />
 
       {project.description ? (
         <p className="mt-3 whitespace-pre-line">{project.description}</p>

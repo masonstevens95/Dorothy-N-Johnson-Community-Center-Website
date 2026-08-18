@@ -53,14 +53,17 @@ export function AdminControls({
   );
 }
 
-/** A standalone maintainer link, for the "add one of these" shortcuts. */
+/**
+ * A standalone maintainer link, for the "add one of these" shortcuts that sit
+ * under a page heading rather than on a card.
+ */
 export function AdminShortcut({ href, label }: { href: string; label: string }) {
   const { isAdmin } = useAdmin();
 
   if (!isAdmin) return null;
 
   return (
-    <Link href={href} className={`${CONTROL} border-line`}>
+    <Link href={href} className={`${CONTROL} mt-3 inline-block border-line`}>
       {label}
     </Link>
   );

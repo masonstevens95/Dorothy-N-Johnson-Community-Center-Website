@@ -7,6 +7,7 @@ import {
 import { formatDate } from "@/lib/format";
 import { toZonedParts } from "@/lib/time";
 import { EventCard } from "../event-card";
+import { AdminShortcut } from "../admin-controls";
 
 export const metadata: Metadata = {
   title: "Calendar",
@@ -44,6 +45,13 @@ export default async function CalendarPage() {
         Everything listed for the next {Math.round(CALENDAR_HORIZON_DAYS / 30)}{" "}
         months.
       </p>
+
+      {/*
+        R6. The forward view is where the maintainer notices a gap, so it is
+        where the shortcut to fill one belongs. It points at the admin form,
+        not at /submit — the maintainer publishes, they do not queue.
+      */}
+      <AdminShortcut href="/admin/events/new" label="Add event" />
 
       {byDay.size === 0 ? (
         <div className="mt-6 rounded-lg border border-line bg-white p-5 text-sm">
