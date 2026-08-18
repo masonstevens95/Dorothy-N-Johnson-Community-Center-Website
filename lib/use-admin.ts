@@ -74,29 +74,44 @@ function loadSummary(): Promise<SummaryResult> {
 /** Matches the server render, where there is no cookie jar to consult. */
 const notOnTheServer = () => false;
 
-export function useAdmin(): AdminState {
-  /*
-   * The cookie is an external store, and read as one. The server snapshot is
-   * always false, which is what makes the prerendered HTML byte-identical for
-   * everyone and hydration clean; React swaps in the real reading immediately
-   * afterwards.
-   *
-   * So admin chrome arrives a frame late. That is the accepted trade: the
-   * alternative is reserving space on every visitor's page for chrome they
-   * will never see, which makes the visitor pay for the maintainer's
-   * convenience.
-   *
-   * True here is optimistic — it is believed before the round trip below
-   * confirms it, and that is safe precisely because being "admin" in this hook
-   * grants nothing. Every link it reveals is gated server-side and every
-   * action re-checks (R8).
-   */
-  const isAdmin = useSyncExternalStore(
+/**
+ * Whether to render maintainer chrome, and nothing else.
+ *
+ * This is what almost every caller wants — an edit link and an add shortcut
+ * have no use for a submission count. Keeping it separate matters because a
+ * calendar page holds one of these per event: sharing the full hook would run
+ * the summary effect twenty times over to populate a number nobody on that
+ * page reads.
+ *
+ * The cookie is an external store, and read as one. The server snapshot is
+ * always false, which is what makes the prerendered HTML byte-identical for
+ * everyone and hydration clean; React swaps in the real reading immediately
+ * afterwards.
+ *
+ * So admin chrome arrives a frame late. That is the accepted trade: the
+ * alternative is reserving space on every visitor's page for chrome they will
+ * never see, which makes the visitor pay for the maintainer's convenience.
+ *
+ * True here is optimistic — it is believed before any round trip confirms it,
+ * and that is safe precisely because being "admin" in this hook grants
+ * nothing. Every link it reveals is gated server-side and every action
+ * re-checks (R8).
+ */
+export function useIsAdmin(): boolean {
+  return useSyncExternalStore(
     subscribeToAdminHint,
     hasAdminHint,
     notOnTheServer,
   );
+}
 
+/**
+ * The above, plus the submission count — for the one caller that shows a
+ * badge. The request behind the count is memoized per tab, so mounting this
+ * more than once still costs at most one round trip.
+ */
+export function useAdmin(): AdminState {
+  const isAdmin = useIsAdmin();
   const [pendingCount, setPendingCount] = useState<number | null>(null);
 
   useEffect(() => {

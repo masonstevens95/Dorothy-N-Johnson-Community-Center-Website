@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useAdmin } from "@/lib/use-admin";
+import { useIsAdmin } from "@/lib/use-admin";
 import { confirmEventAction } from "./admin-actions";
 
 /**
@@ -17,7 +17,7 @@ import { confirmEventAction } from "./admin-actions";
  * paint them. Gating inside each control means the markup is constructed in the
  * maintainer's browser and exists nowhere else (R1).
  *
- * Nothing here is a permission check. useAdmin reads a cookie that grants
+ * Nothing here is a permission check. useIsAdmin reads a cookie that grants
  * nothing; every href below lands on a route the dashboard layout guards, and
  * the confirm button calls an action that re-checks before it writes (R8).
  *
@@ -39,7 +39,7 @@ export function AdminControls({
   editHref: string;
   confirmEventId?: string;
 }) {
-  const { isAdmin } = useAdmin();
+  const isAdmin = useIsAdmin();
 
   if (!isAdmin) return null;
 
@@ -58,7 +58,7 @@ export function AdminControls({
  * under a page heading rather than on a card.
  */
 export function AdminShortcut({ href, label }: { href: string; label: string }) {
-  const { isAdmin } = useAdmin();
+  const isAdmin = useIsAdmin();
 
   if (!isAdmin) return null;
 

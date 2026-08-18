@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useAdmin } from "@/lib/use-admin";
+import { useIsAdmin } from "@/lib/use-admin";
 
 /**
  * The maintainer's door — last in the header and quieter than everything
@@ -24,7 +24,7 @@ import { useAdmin } from "@/lib/use-admin";
  * only for the one person who no longer needs it.
  */
 export function MaintainerLink() {
-  const { isAdmin } = useAdmin();
+  const isAdmin = useIsAdmin();
 
   if (isAdmin) return null;
 

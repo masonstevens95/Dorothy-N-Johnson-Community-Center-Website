@@ -99,10 +99,15 @@ export function clearAdminHint(): void {
  * This is not the server reading the hint — it never does, and must not start.
  * It is the server telling a browser to throw away a stale one, which is the
  * belt to the client's braces: the hook clears the hint itself on a 401, and
- * this covers the case where that JavaScript never gets to run. No Secure
- * attribute, because removal matches on name, path, and domain only.
+ * this covers the case where that JavaScript never gets to run.
+ *
+ * Built from the same attributes as every other write here, so a cookie the
+ * server expires cannot drift from the cookie the client sets and quietly stop
+ * matching it. There is no `location` on the server, so no Secure attribute —
+ * which is correct either way, since removal matches on name, path and domain
+ * only.
  */
-export const EXPIRED_ADMIN_HINT_COOKIE = `${ADMIN_HINT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+export const EXPIRED_ADMIN_HINT_COOKIE = `${ADMIN_HINT_COOKIE}=; ${attributes(0)}`;
 
 /**
  * Presence is the entire signal — the value carries nothing, so there is
