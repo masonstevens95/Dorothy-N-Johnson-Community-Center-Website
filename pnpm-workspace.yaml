@@ -1,0 +1,9 @@
+# pnpm 11 reads build-script approvals from this file rather than package.json.
+# These need postinstall scripts to fetch or compile native binaries: esbuild
+# and unrs-resolver back the test runner and linter, @tailwindcss/oxide backs
+# the CSS build, and sharp does the image processing in lib/images.ts.
+allowBuilds:
+  "@tailwindcss/oxide": true
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
