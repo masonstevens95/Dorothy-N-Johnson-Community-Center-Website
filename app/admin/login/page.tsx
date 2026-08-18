@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
@@ -21,6 +22,18 @@ export default function LoginPage() {
       </p>
 
       <LoginForm />
+
+      {/*
+        Since "Maintainer" went into the public header, arriving here by
+        accident is the common case rather than the rare one, and the copy
+        above only helps the neighbor who has an event to post. This is the
+        way out for everyone else, so the page is not a dead end.
+      */}
+      <p className="mt-8 text-sm">
+        <Link href="/" className="underline">
+          Back to what&rsquo;s on at the center
+        </Link>
+      </p>
     </main>
   );
 }

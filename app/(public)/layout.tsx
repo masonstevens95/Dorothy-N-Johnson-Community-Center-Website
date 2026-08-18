@@ -31,7 +31,9 @@ export default async function PublicLayout({
           <Link href="/" className="text-base font-semibold tracking-tight">
             {site.name}
           </Link>
-          <nav className="mt-2 flex gap-4 text-sm">
+          {/* R7. Wraps rather than overflowing: five items no longer fit on
+              one line at 320px. */}
+          <nav className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
             <Link href="/" className="underline">
               What&rsquo;s on
             </Link>
@@ -43,6 +45,22 @@ export default async function PublicLayout({
             </Link>
             <Link href="/submit" className="underline">
               Add an event
+            </Link>
+            {/*
+              The maintainer's door — last and muted, because it is the one
+              item here that is not for visitors. "Maintainer" and not "Sign
+              in": beside "Add an event", "sign in" reads as though posting
+              needs an account, which is the opposite of true (R1, R17).
+
+              It points at /admin rather than /admin/login so a single static
+              href is correct in both session states — the dashboard layout
+              redirects a sessionless request onward to the login page. That
+              delegation is why this layout reads no session, which is what
+              keeps every public page static and the `revalidate` above real.
+              Do not add one here to hide or relabel this link.
+            */}
+            <Link href="/admin" className="text-muted">
+              Maintainer
             </Link>
           </nav>
         </div>

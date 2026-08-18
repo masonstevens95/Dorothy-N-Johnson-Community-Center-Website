@@ -39,6 +39,21 @@ test("publishing an event makes it appear on the public page", async ({ page }) 
   await expect(page.getByText(/Confirmed today/).first()).toBeVisible();
 });
 
+test("the maintainer link goes straight to the dashboard when signed in", async ({
+  page,
+}) => {
+  // The same static href that sends a visitor to the login form has to send
+  // the maintainer to the work — that is what buys a session-free public
+  // layout, so both halves are asserted.
+  await page.goto("/");
+  await page.getByRole("link", { name: "Maintainer", exact: true }).click();
+
+  await expect(page).toHaveURL("/admin");
+  await expect(
+    page.getByRole("heading", { name: "Confirmation pass" }),
+  ).toBeVisible();
+});
+
 test.describe("as a signed-out visitor", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -76,6 +91,69 @@ test.describe("as a signed-out visitor", () => {
       await expect(page.getByRole("link", { name: /^Edit/ })).toHaveCount(0);
       await expect(page.locator('input[type="checkbox"]')).toHaveCount(0);
     }
+  });
+
+  test("every public page offers the maintainer entry point", async ({ page }) => {
+    // It lives in the shared layout, so it is on all of them or none.
+    for (const path of ["/", "/calendar", "/projects"]) {
+      await page.goto(path);
+
+      await expect(
+        page.getByRole("link", { name: "Maintainer", exact: true }),
+      ).toBeVisible();
+    }
+  });
+
+  test("following the maintainer link reaches the sign-in page and no further", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Maintainer", exact: true }).click();
+
+    // The href is /admin; the dashboard guard is what turns that into the
+    // login page for a visitor without a session (R13).
+    await expect(page).toHaveURL(/\/admin\/login/);
+    await expect(
+      page.getByRole("heading", { name: "Maintainer sign-in" }),
+    ).toBeVisible();
+
+    // Nothing from behind the guard leaked on the way.
+    await expect(
+      page.getByRole("heading", { name: "Confirmation pass" }),
+    ).toHaveCount(0);
+  });
+
+  test("a visitor who took the wrong turn can get back without the back button", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Maintainer", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/login/);
+
+    await page.getByRole("link", { name: /Back to what.s on/ }).click();
+
+    await expect(page).toHaveURL("/");
+    await expect(page.getByRole("heading", { name: /What.s on/ })).toBeVisible();
+  });
+
+  test("the header wraps rather than overflowing on a narrow phone", async ({
+    page,
+  }) => {
+    // R7. 320px is the narrowest phone still in use, and the fifth nav item
+    // is what pushed the existing row past it.
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto("/");
+
+    await expect(
+      page.getByRole("link", { name: "Maintainer", exact: true }),
+    ).toBeVisible();
+
+    const overflows = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    );
+    expect(overflows).toBe(false);
   });
 
   test("the forward calendar shows more than the landing page", async ({ page }) => {
