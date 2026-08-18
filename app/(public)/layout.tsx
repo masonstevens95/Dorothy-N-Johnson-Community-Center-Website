@@ -4,6 +4,7 @@ import { formatAge } from "@/lib/format";
 import { site } from "@/lib/site";
 import { SiteHeader } from "@/app/site-header";
 import { MaintainerLink } from "@/app/maintainer-link";
+import { AdminBar } from "@/app/admin-bar";
 
 /**
  * Public pages render statically and revalidate on publish, keeping read
@@ -31,7 +32,16 @@ export default async function PublicLayout({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <SiteHeader maintainerSlot={<MaintainerLink />} />
+      {/*
+        Both slots are client components that render null for a visitor, so
+        this stays a server component that reads no session and every public
+        page stays statically prerendered. The maintainer's chrome is assembled
+        in their browser from a cookie, not on the server from a session.
+      */}
+      <SiteHeader
+        maintainerSlot={<MaintainerLink />}
+        adminActions={<AdminBar />}
+      />
 
       {/*
         R11. Appears on every public page when nothing at all has been

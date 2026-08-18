@@ -39,12 +39,25 @@ test("publishing an event makes it appear on the public page", async ({ page }) 
   await expect(page.getByText(/Confirmed today/).first()).toBeVisible();
 });
 
+type Page = import("@playwright/test").Page;
+
 /** The site's own navigation, as opposed to the maintainer-mode strip below it. */
-function siteNav(page: import("@playwright/test").Page) {
-  return page.locator("header nav").first();
+function siteNav(page: Page) {
+  return page.getByRole("navigation", { name: "Site" });
+}
+
+/** The maintainer-mode strip, which no visitor ever has. */
+function adminStrip(page: Page) {
+  return page.getByRole("navigation", { name: "Maintainer actions" });
 }
 
 const VISITOR_NAV = [/What.s on/, /^Calendar$/, /^Projects$/, /^Add an event$/];
+const MAINTAINER_ACTIONS = [
+  /^Confirmation pass$/,
+  /^New event$/,
+  /^Projects$/,
+  /^Queue/,
+];
 
 test("the maintainer keeps the site's own navigation inside the admin shell", async ({
   page,
@@ -76,14 +89,127 @@ test("the admin shell fits a narrow phone too", async ({ page }) => {
   expect(overflows).toBe(false);
 });
 
-test("the maintainer link goes straight to the dashboard when signed in", async ({
+test("the maintainer strip follows the maintainer onto the public pages", async ({
   page,
 }) => {
-  // The same static href that sends a visitor to the login form has to send
-  // the maintainer to the work — that is what buys a session-free public
-  // layout, so both halves are asserted.
+  // R3, R6. The point of the whole hint-cookie arrangement: the maintainer
+  // gets their controls on the page they are already looking at, and the page
+  // is still the statically rendered one every visitor gets.
   await page.goto("/");
-  await page.getByRole("link", { name: "Maintainer", exact: true }).click();
+  const eventHref = await page
+    .locator("article h3 a")
+    .first()
+    .getAttribute("href");
+  expect(eventHref).toBeTruthy();
+
+  for (const path of ["/", "/calendar", "/projects", eventHref!, "/admin"]) {
+    await page.goto(path);
+
+    await expect(
+      page.getByText("Maintainer view"),
+      `no maintainer strip on ${path}`,
+    ).toBeVisible();
+
+    for (const name of MAINTAINER_ACTIONS) {
+      await expect(adminStrip(page).getByRole("link", { name })).toBeVisible();
+    }
+    await expect(
+      adminStrip(page).getByRole("button", { name: "Sign out" }),
+    ).toBeVisible();
+  }
+});
+
+test("the maintainer is not offered the door to the room they are in", async ({
+  page,
+}) => {
+  // The strip has replaced the "Maintainer" link, rather than sitting beside
+  // it. Asserted on both a public route, where the swap happens in the
+  // browser, and an admin route, where it happens on the server.
+  for (const path of ["/", "/admin"]) {
+    await page.goto(path);
+
+    await expect(page.getByText("Maintainer view")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Maintainer", exact: true }),
+      `the maintainer door is still showing on ${path}`,
+    ).toHaveCount(0);
+  }
+});
+
+test("the maintainer strip fits a narrow phone", async ({ page }) => {
+  // R7. The strip is the widest thing either header carries.
+  await page.setViewportSize({ width: 320, height: 800 });
+
+  for (const path of ["/", "/admin"]) {
+    await page.goto(path);
+    await expect(page.getByText("Maintainer view")).toBeVisible();
+
+    const overflows = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    );
+    expect(overflows, `${path} scrolls sideways at 320px`).toBe(false);
+  }
+});
+
+test("the queue link counts what is actually waiting", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  // R6. The count is the reason the summary request exists at all, so it has
+  // to track reality rather than a number fixed at build time.
+  const queueLink = () => adminStrip(page).getByRole("link", { name: /^Queue/ });
+
+  /*
+   * Waits for the summary to land before reading the badge. Without this the
+   * pre-fetch label ("Queue", no number) is indistinguishable from a real
+   * count of zero, and the test would pass while measuring nothing.
+   */
+  async function loadAndCount(): Promise<number> {
+    const [response] = await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/admin/summary")),
+      page.goto("/"),
+    ]);
+    expect(response.status()).toBe(200);
+
+    const text = (await queueLink().textContent()) ?? "";
+    return Number(text.match(/\((\d+)\)/)?.[1] ?? 0);
+  }
+
+  const before = await loadAndCount();
+
+  const stranger = await browser.newContext({
+    baseURL,
+    storageState: { cookies: [], origins: [] },
+  });
+  const visitor = await stranger.newPage();
+  await visitor.goto("/submit");
+  await visitor.getByLabel(/What is it/).fill(`Queue counter ${Date.now()}`);
+  await visitor.getByLabel(/When/).fill(soon(20));
+  await visitor.getByRole("button", { name: "Send it in" }).click();
+  await expect(visitor.getByRole("status")).toContainText("Thank you");
+  await stranger.close();
+
+  await page.goto("/");
+  await expect(queueLink()).toHaveText(`Queue (${before + 1})`);
+});
+
+test("the same /admin href serves the maintainer and the visitor", async ({
+  page,
+}) => {
+  // One static href, two outcomes by session, decided by the dashboard guard
+  // rather than by anything the public layout knows. That delegation is what
+  // buys a session-free public layout, so the maintainer's half is asserted
+  // here and the visitor's half below, in the signed-out block.
+  //
+  // The maintainer reaches it through the strip: the "Maintainer" link is for
+  // people who are not signed in, and it has been replaced for those who are.
+  await page.goto("/");
+  await adminStrip(page)
+    .getByRole("link", { name: "Confirmation pass" })
+    .click();
 
   await expect(page).toHaveURL("/admin");
   await expect(

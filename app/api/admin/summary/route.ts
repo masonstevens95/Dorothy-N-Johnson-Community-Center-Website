@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { count, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { events } from "@/lib/db/schema";
 import { UnauthorizedError, requireAdmin } from "@/lib/auth-guard";
 import { EXPIRED_ADMIN_HINT_COOKIE } from "@/lib/admin-hint";
+import { countPendingEvents } from "@/lib/events/pending";
 
 /**
  * The only request a public page ever makes on the maintainer's behalf, and
@@ -41,15 +39,8 @@ export async function GET(request: Request) {
     throw error;
   }
 
-  // Mirrors the pending selection in app/admin/(dashboard)/page.tsx, counted
-  // rather than fetched — the badge needs the number, not the events.
-  const [pending] = await db
-    .select({ value: count() })
-    .from(events)
-    .where(eq(events.state, "pending"));
-
   return NextResponse.json(
-    { pendingCount: pending?.value ?? 0 },
+    { pendingCount: await countPendingEvents() },
     { headers: { "cache-control": "no-store" } },
   );
 }

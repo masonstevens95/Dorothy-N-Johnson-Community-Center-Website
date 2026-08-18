@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getSession } from "@/lib/auth-guard";
+import { countPendingEvents } from "@/lib/events/pending";
 import { SiteHeader } from "@/app/site-header";
-import { SignOutButton } from "./sign-out-button";
+import { AdminActionsNav } from "@/app/admin-actions-nav";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -46,17 +46,7 @@ export default async function AdminLayout({
       <SiteHeader
         width="wide"
         adminActions={
-          <div className="border-t border-line bg-accent/5">
-            <nav className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2 text-sm">
-              <Link href="/admin/events/new" className="underline">
-                New event
-              </Link>
-              <Link href="/admin/projects" className="underline">
-                Projects
-              </Link>
-              <SignOutButton />
-            </nav>
-          </div>
+          <AdminActionsNav width="wide" pendingCount={await countPendingEvents()} />
         }
       />
       {children}

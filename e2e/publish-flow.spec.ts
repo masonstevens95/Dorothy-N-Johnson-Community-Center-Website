@@ -155,3 +155,42 @@ test("signing out closes the admin surfaces again", async ({ browser, baseURL })
 
   await context.close();
 });
+
+test("signing out from a public page takes the maintainer chrome with it", async ({
+  browser,
+  baseURL,
+}) => {
+  // Same reason as above for the private context: signing out invalidates the
+  // token the shared storage state carries.
+  //
+  // The case worth its own test is that the strip is now reachable from pages
+  // the sign-out button was never on before. Leaving stale chrome behind on a
+  // public page would show the maintainer controls that only lead back to the
+  // login form, which reads as the site being broken rather than as them being
+  // signed out.
+  const context = await browser.newContext({
+    baseURL,
+    storageState: { cookies: [], origins: [] },
+  });
+  const page = await context.newPage();
+
+  await page.goto("/admin/login");
+  await page.getByLabel("Email").fill(E2E_ADMIN_EMAIL);
+  await page.getByLabel("Password").fill(E2E_ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  await page.goto("/calendar");
+  await expect(page.getByText("Maintainer view")).toBeVisible();
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+
+  await expect(page.getByText("Maintainer view")).toHaveCount(0);
+  expect(
+    (await context.cookies()).some(
+      (cookie) => cookie.name === ADMIN_HINT_COOKIE,
+    ),
+  ).toBe(false);
+
+  await context.close();
+});

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { site } from "@/lib/site";
+import { HEADER_CONTAINER, type HeaderWidth } from "./header-width";
 import { NavLink } from "./nav-link";
 
 /**
@@ -22,15 +23,6 @@ import { NavLink } from "./nav-link";
  * decoration is paid for in bytes.
  */
 
-const CONTAINER = {
-  /** The public shell's reading width. */
-  narrow: "max-w-2xl",
-  /** The admin shell's, which has wider tables and lists to hold. */
-  wide: "max-w-3xl",
-} as const;
-
-export type HeaderWidth = keyof typeof CONTAINER;
-
 export function SiteHeader({
   width = "narrow",
   maintainerSlot,
@@ -47,7 +39,7 @@ export function SiteHeader({
 }) {
   return (
     <header className="border-b border-line">
-      <div className={`mx-auto ${CONTAINER[width]} px-5 pt-4`}>
+      <div className={`mx-auto ${HEADER_CONTAINER[width]} px-5 pt-4`}>
         <Link href="/" className="text-base font-semibold tracking-tight">
           {site.name}
         </Link>
@@ -57,7 +49,7 @@ export function SiteHeader({
           They wrap at 320px rather than overflowing (R7), and the order is what
           makes the wrap read as two deliberate groups instead of a spill.
         */}
-        <nav className="mt-1 flex flex-wrap items-center gap-x-5">
+        <nav aria-label="Site" className="mt-1 flex flex-wrap items-center gap-x-5">
           <NavLink href="/">What&rsquo;s on</NavLink>
           <NavLink href="/calendar">Calendar</NavLink>
           <NavLink href="/projects">Projects</NavLink>
