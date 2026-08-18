@@ -39,6 +39,43 @@ test("publishing an event makes it appear on the public page", async ({ page }) 
   await expect(page.getByText(/Confirmed today/).first()).toBeVisible();
 });
 
+/** The site's own navigation, as opposed to the maintainer-mode strip below it. */
+function siteNav(page: import("@playwright/test").Page) {
+  return page.locator("header nav").first();
+}
+
+const VISITOR_NAV = [/What.s on/, /^Calendar$/, /^Projects$/, /^Add an event$/];
+
+test("the maintainer keeps the site's own navigation inside the admin shell", async ({
+  page,
+}) => {
+  // R3. One header, both shells: the same buttons the maintainer had on the
+  // public pages are still there while they work.
+  await page.goto("/admin");
+
+  for (const name of VISITOR_NAV) {
+    await expect(siteNav(page).getByRole("link", { name })).toBeVisible();
+  }
+
+  // The door to the room they are standing in is noise, so it is not offered.
+  await expect(
+    siteNav(page).getByRole("link", { name: "Maintainer", exact: true }),
+  ).toHaveCount(0);
+});
+
+test("the admin shell fits a narrow phone too", async ({ page }) => {
+  // R7. The shared header now carries more on admin routes than it used to.
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/admin");
+
+  const overflows = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth >
+      document.documentElement.clientWidth,
+  );
+  expect(overflows).toBe(false);
+});
+
 test("the maintainer link goes straight to the dashboard when signed in", async ({
   page,
 }) => {
@@ -136,24 +173,67 @@ test.describe("as a signed-out visitor", () => {
     await expect(page.getByRole("heading", { name: /What.s on/ })).toBeVisible();
   });
 
+  test("the header marks the page you are on and only that page", async ({
+    page,
+  }) => {
+    // R7. The active marker arrives at hydration; what it must never do is
+    // claim two pages at once.
+    await page.goto("/calendar");
+
+    await expect(
+      siteNav(page).getByRole("link", { name: "Calendar", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+
+    await expect(
+      siteNav(page).locator('[aria-current="page"]'),
+    ).toHaveCount(1);
+  });
+
+  test("the header reads without JavaScript, minus the active marker", async ({
+    browser,
+    baseURL,
+  }) => {
+    // The nav is server-rendered markup; only NavLink's current-page marker
+    // needs the client. Every destination has to stay reachable without it.
+    const context = await browser.newContext({
+      baseURL,
+      javaScriptEnabled: false,
+      storageState: { cookies: [], origins: [] },
+    });
+    const page = await context.newPage();
+    await page.goto("/calendar");
+
+    for (const name of VISITOR_NAV) {
+      await expect(siteNav(page).getByRole("link", { name })).toBeVisible();
+    }
+    await expect(
+      siteNav(page).getByRole("link", { name: "Maintainer", exact: true }),
+    ).toBeVisible();
+
+    await context.close();
+  });
+
   test("the header wraps rather than overflowing on a narrow phone", async ({
     page,
   }) => {
     // R7. 320px is the narrowest phone still in use, and the fifth nav item
     // is what pushed the existing row past it.
     await page.setViewportSize({ width: 320, height: 800 });
-    await page.goto("/");
 
-    await expect(
-      page.getByRole("link", { name: "Maintainer", exact: true }),
-    ).toBeVisible();
+    for (const path of ["/", "/calendar", "/projects"]) {
+      await page.goto(path);
 
-    const overflows = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth >
-        document.documentElement.clientWidth,
-    );
-    expect(overflows).toBe(false);
+      await expect(
+        page.getByRole("link", { name: "Maintainer", exact: true }),
+      ).toBeVisible();
+
+      const overflows = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      );
+      expect(overflows).toBe(false);
+    }
   });
 
   test("the forward calendar shows more than the landing page", async ({ page }) => {
