@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublicEvent, getPublishedEventIds } from "@/lib/public-data";
 import { formatAge, formatEventWhen } from "@/lib/format";
+import { AdminControls } from "../../admin-controls";
 
 export async function generateStaticParams() {
   const ids = await getPublishedEventIds();
@@ -88,6 +89,16 @@ export default async function EventPage({
           </span>
         )}
       </p>
+
+      {/*
+        R4, R5. Beside the freshness panel, because that panel is the thing
+        confirming updates — the maintainer taps Confirm and watches the
+        sentence above it change.
+      */}
+      <AdminControls
+        editHref={`/admin/events/${event.id}/edit`}
+        confirmEventId={event.id}
+      />
 
       {event.description ? (
         <p className="mt-5 whitespace-pre-line">{event.description}</p>

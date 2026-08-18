@@ -92,6 +92,58 @@ test("confirms several events in one pass without editing them (AE5)", async ({
   }
 });
 
+test("confirms a stale event from the public page it is listed on (R5)", async ({
+  page,
+}) => {
+  // The single most frequent maintenance action on this site, moved to where
+  // the maintainer already is. They are standing at the bulletin board with
+  // /calendar open; tapping Confirm has to be the whole interaction.
+  const title = `Still on the board ${Date.now()}`;
+  await publishEvent(page, title, 6);
+
+  await page.goto("/");
+  const card = page.locator("article").filter({ hasText: title });
+  await expect(card.getByRole("button", { name: "Confirm" })).toBeVisible();
+
+  await card.getByRole("button", { name: "Confirm" }).click();
+
+  // One tap and it is done. No form opened, no dialog, and the page the
+  // maintainer was reading is the page they are still reading — which is the
+  // property the whole freshness design rests on.
+  await expect(card.getByRole("status")).toHaveText("Confirmed");
+  await expect(page).toHaveURL("/");
+  await expect(card.getByRole("button", { name: "Confirm" })).toHaveCount(0);
+  await expect(card.getByText(/Confirmed today/)).toBeVisible();
+});
+
+test("reaches an event's edit form in one tap from a public page (R4)", async ({
+  page,
+}) => {
+  const title = `Needs a fix ${Date.now()}`;
+  await publishEvent(page, title, 7);
+
+  // From the card on the landing page.
+  await page.goto("/");
+  await page
+    .locator("article")
+    .filter({ hasText: title })
+    .getByRole("link", { name: "Edit" })
+    .click();
+
+  await expect(page).toHaveURL(/\/admin\/events\/[^/]+\/edit/);
+  await expect(page.getByLabel("Event name")).toHaveValue(title);
+
+  // And from the event's own page, which is the other place the maintainer
+  // notices something is wrong.
+  await page.goto("/");
+  await page.locator("article").filter({ hasText: title }).locator("h3 a").click();
+  await expect(page).toHaveURL(/\/events\//);
+
+  await page.getByRole("link", { name: "Edit" }).click();
+  await expect(page).toHaveURL(/\/admin\/events\/[^/]+\/edit/);
+  await expect(page.getByLabel("Event name")).toHaveValue(title);
+});
+
 test("an event edited in admin keeps its identity", async ({ page }) => {
   await publishEvent(page, "Typo nite", 9);
 
