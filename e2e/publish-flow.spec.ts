@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD } from "./global-setup";
+import { ADMIN_HINT_COOKIE } from "../lib/admin-hint";
 
 /**
  * The flow this site exists to support: the maintainer is standing at the
@@ -134,8 +135,20 @@ test("signing out closes the admin surfaces again", async ({ browser, baseURL })
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/admin$/);
 
+  const hint = async () =>
+    (await context.cookies()).some(
+      (cookie) => cookie.name === ADMIN_HINT_COOKIE,
+    );
+
+  // Signing in writes the rendering hint that puts maintainer controls on the
+  // public pages; signing out has to take it away again, or the maintainer
+  // keeps seeing controls that now only lead back to the login form.
+  expect(await hint()).toBe(true);
+
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/admin\/login/);
+
+  expect(await hint()).toBe(false);
 
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/login/);

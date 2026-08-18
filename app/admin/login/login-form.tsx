@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { signIn } from "@/lib/auth-client";
+import { setAdminHint } from "@/lib/admin-hint";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -23,6 +24,13 @@ export function LoginForm() {
       setPending(false);
       return;
     }
+
+    // Before the navigation below, not after: that line leaves this page for
+    // good, so anything written after it never runs. The hint is what makes
+    // maintainer controls appear on the public pages (lib/admin-hint.ts); it
+    // grants nothing, and losing it here would simply mean a signed-in
+    // maintainer seeing a visitor's site until they signed in again.
+    setAdminHint();
 
     // A full navigation rather than router.push: the session cookie is set by
     // the sign-in response, and a client-side transition can issue the request
