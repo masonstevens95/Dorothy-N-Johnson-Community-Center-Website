@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { getPublicProjects } from "@/lib/projects/public-data";
+import { AdminControls, AdminShortcut } from "../admin-controls";
 
 export const metadata: Metadata = {
   title: "Projects",
@@ -26,6 +27,15 @@ export default async function ProjectsPage() {
   return (
     <main className="mx-auto max-w-2xl px-5 py-8">
       <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
+
+      {/*
+        R6. Contextual to the page rather than in the header, because "add one
+        of these" only makes sense while looking at the list of these. Outside
+        the empty check on purpose: an empty gallery is exactly when the
+        maintainer most wants it, and a visitor still sees nothing but the
+        empty-state copy below.
+      */}
+      <AdminShortcut href="/admin/projects/new" label="Add project" />
 
       {projects.length === 0 ? (
         <p className="mt-6 rounded-lg border border-line bg-white p-5 text-sm text-muted">
@@ -115,6 +125,18 @@ function ProjectCard({
           </Link>
         </p>
       ) : null}
+
+      {/*
+        R4. Keyed by id, not by slug — this public route is /projects/[slug]
+        but the edit form is /admin/projects/[id]/edit, and the two are
+        different values for the same project. Reaching for `project.slug`
+        here, which is the one already in scope for every other link on this
+        card, produces a link that looks right and 404s.
+
+        No confirm control: projects are not checked against the bulletin
+        board, so there is nothing here for one to mean.
+      */}
+      <AdminControls editHref={`/admin/projects/${project.id}/edit`} />
     </article>
   );
 }

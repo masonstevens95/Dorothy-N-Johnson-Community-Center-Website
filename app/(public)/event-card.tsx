@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { PublicOccurrence } from "@/lib/public-data";
 import { formatAge, formatEventWhen } from "@/lib/format";
+import { AdminControls } from "./admin-controls";
 
 /**
  * An unverified event is still shown, with its age visible.
@@ -67,6 +68,17 @@ export function EventCard({ occurrence, freshness, image }: PublicOccurrence) {
           </span>
         )}
       </p>
+
+      {/*
+        R4, R5. Last in the card and rendered only in the maintainer's own
+        browser, so a visitor's card is unchanged and the maintainer's does not
+        reflow around controls that arrive after hydration. Directly under the
+        freshness line because that line is what confirming updates.
+      */}
+      <AdminControls
+        editHref={`/admin/events/${event.id}/edit`}
+        confirmEventId={event.id}
+      />
     </article>
   );
 }

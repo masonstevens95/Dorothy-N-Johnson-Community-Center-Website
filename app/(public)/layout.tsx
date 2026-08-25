@@ -1,8 +1,10 @@
-import Link from "next/link";
 import { getSiteFreshness } from "@/lib/public-data";
 import { STALENESS_WINDOW_DAYS } from "@/lib/freshness";
 import { formatAge } from "@/lib/format";
 import { site } from "@/lib/site";
+import { SiteHeader } from "@/app/site-header";
+import { MaintainerLink } from "@/app/maintainer-link";
+import { AdminBar } from "@/app/admin-bar";
 
 /**
  * Public pages render statically and revalidate on publish, keeping read
@@ -14,6 +16,10 @@ import { site } from "@/lib/site";
  * confirmed "2 days ago" indefinitely. The unattended site is exactly the case
  * the freshness design exists for, so the one thing that must not depend on
  * someone publishing is the notice that says nobody has.
+ *
+ * This layout reads no session, and must not start. That absence is what keeps
+ * `revalidate` above real. Anything the maintainer should see here arrives
+ * through a client component that gates itself — see app/site-header.tsx.
  */
 export const revalidate = 3600;
 
@@ -26,45 +32,16 @@ export default async function PublicLayout({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="border-b border-line">
-        <div className="mx-auto max-w-2xl px-5 py-4">
-          <Link href="/" className="text-base font-semibold tracking-tight">
-            {site.name}
-          </Link>
-          {/* R7. Wraps rather than overflowing: five items no longer fit on
-              one line at 320px. */}
-          <nav className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-            <Link href="/" className="underline">
-              What&rsquo;s on
-            </Link>
-            <Link href="/calendar" className="underline">
-              Calendar
-            </Link>
-            <Link href="/projects" className="underline">
-              Projects
-            </Link>
-            <Link href="/submit" className="underline">
-              Add an event
-            </Link>
-            {/*
-              The maintainer's door — last and muted, because it is the one
-              item here that is not for visitors. "Maintainer" and not "Sign
-              in": beside "Add an event", "sign in" reads as though posting
-              needs an account, which is the opposite of true (R1, R17).
-
-              It points at /admin rather than /admin/login so a single static
-              href is correct in both session states — the dashboard layout
-              redirects a sessionless request onward to the login page. That
-              delegation is why this layout reads no session, which is what
-              keeps every public page static and the `revalidate` above real.
-              Do not add one here to hide or relabel this link.
-            */}
-            <Link href="/admin" className="text-muted">
-              Maintainer
-            </Link>
-          </nav>
-        </div>
-      </header>
+      {/*
+        Both slots are client components that render null for a visitor, so
+        this stays a server component that reads no session and every public
+        page stays statically prerendered. The maintainer's chrome is assembled
+        in their browser from a cookie, not on the server from a session.
+      */}
+      <SiteHeader
+        maintainerSlot={<MaintainerLink />}
+        adminActions={<AdminBar />}
+      />
 
       {/*
         R11. Appears on every public page when nothing at all has been

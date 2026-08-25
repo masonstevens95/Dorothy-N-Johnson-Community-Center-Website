@@ -68,6 +68,32 @@ pnpm dev
 There is no public registration route. `pnpm seed:admin` is the only way an
 account comes into existence.
 
+## Maintainer controls on public pages
+
+Signed in, the maintainer sees a "Maintainer view" strip in the header on every
+page, plus Edit and Confirm controls on the public event and project surfaces.
+Confirming an event against the bulletin board is one tap from the page it is
+listed on — no edit form, no navigation.
+
+None of that is server-rendered. Public pages read no session, which is what
+keeps them statically prerendered and read traffic off the function budget. The
+chrome is assembled in the browser instead, gated on a `dnj_maintainer` cookie
+written at sign-in and cleared at sign-out.
+
+**That cookie is a rendering hint with no authority.** Its value is the literal
+`1`, nothing on the server reads it, and it is deliberately not `httpOnly`
+because client JavaScript is what reads it. Forging it shows a stranger some
+links that redirect to `/admin/login` and a Confirm button that returns an
+error, and nothing else. Every admin route is gated by the dashboard layout and
+every mutation calls `requireAdmin` — see `lib/admin-hint.ts` and
+`lib/auth-guard.ts`. Do not gate anything real on it.
+
+The one request it enables is `GET /api/admin/summary`, which returns the
+pending-submission count for the header badge and, by answering at all, proves
+the session is still alive. A 401 expires the hint, so a cookie that outlived
+its session heals on the next page load. A visitor's page issues no admin
+request at all.
+
 ## Commands
 
 | Command | What it does |

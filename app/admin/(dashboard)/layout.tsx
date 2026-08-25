@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getSession } from "@/lib/auth-guard";
-import { SignOutButton } from "./sign-out-button";
+import { countPendingEvents } from "@/lib/events/pending";
+import { SiteHeader } from "@/app/site-header";
+import { AdminActionsNav } from "@/app/admin-actions-nav";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -31,25 +32,23 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-line">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-3">
-          <Link href="/admin" className="text-sm font-semibold">
-            Maintainer
-          </Link>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link href="/admin/events/new" className="underline">
-              New event
-            </Link>
-            <Link href="/admin/projects" className="underline">
-              Projects
-            </Link>
-            <Link href="/" className="underline">
-              View site
-            </Link>
-            <SignOutButton />
-          </nav>
-        </div>
-      </header>
+      {/*
+        The same header the public pages get, so the maintainer keeps the site's
+        own navigation while they work (R3) and the two shells cannot drift
+        apart again. No "View site" link: the public navigation is right there.
+        No maintainer door either — this is the room it opens onto.
+
+        This shell is already force-dynamic and already holds the session, so it
+        fills the admin slot server-side. The public shell fills it with a
+        client component instead, which is what lets one header serve both
+        without either paying the other's rendering cost.
+      */}
+      <SiteHeader
+        width="wide"
+        adminActions={
+          <AdminActionsNav width="wide" pendingCount={await countPendingEvents()} />
+        }
+      />
       {children}
     </div>
   );

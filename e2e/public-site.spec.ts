@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { ADMIN_HINT_COOKIE } from "../lib/admin-hint";
 
 /**
  * The visitor's side (F1). A newcomer arrives on a phone, having never heard
@@ -39,14 +40,192 @@ test("publishing an event makes it appear on the public page", async ({ page }) 
   await expect(page.getByText(/Confirmed today/).first()).toBeVisible();
 });
 
-test("the maintainer link goes straight to the dashboard when signed in", async ({
+test("adding a project makes it appear in the public gallery", async ({ page }) => {
+  // Also the fixture the signed-out suite below leans on: its guarantee has to
+  // be checked against a project *detail* page, and there is no other way for
+  // one to exist within this file.
+  const name = `Community garden ${Date.now()}`;
+
+  await page.goto("/admin/projects/new");
+  await page.getByLabel("Project name").fill(name);
+  await page.getByRole("button", { name: "Create project" }).click();
+  await expect(page).toHaveURL(/\/admin\/projects\/[0-9a-f-]{36}\/edit/);
+
+  await page.goto("/projects");
+  await expect(page.getByRole("link", { name })).toBeVisible();
+});
+
+type Page = import("@playwright/test").Page;
+
+/** The site's own navigation, as opposed to the maintainer-mode strip below it. */
+function siteNav(page: Page) {
+  return page.getByRole("navigation", { name: "Site" });
+}
+
+/** The maintainer-mode strip, which no visitor ever has. */
+function adminStrip(page: Page) {
+  return page.getByRole("navigation", { name: "Maintainer actions" });
+}
+
+const VISITOR_NAV = [/What.s on/, /^Calendar$/, /^Projects$/, /^Add an event$/];
+const MAINTAINER_ACTIONS = [
+  /^Confirmation pass$/,
+  /^New event$/,
+  /^Projects$/,
+  /^Queue/,
+];
+
+test("the maintainer keeps the site's own navigation inside the admin shell", async ({
   page,
 }) => {
-  // The same static href that sends a visitor to the login form has to send
-  // the maintainer to the work — that is what buys a session-free public
-  // layout, so both halves are asserted.
+  // R3. One header, both shells: the same buttons the maintainer had on the
+  // public pages are still there while they work.
+  await page.goto("/admin");
+
+  for (const name of VISITOR_NAV) {
+    await expect(siteNav(page).getByRole("link", { name })).toBeVisible();
+  }
+
+  // The door to the room they are standing in is noise, so it is not offered.
+  await expect(
+    siteNav(page).getByRole("link", { name: "Maintainer", exact: true }),
+  ).toHaveCount(0);
+});
+
+test("the admin shell fits a narrow phone too", async ({ page }) => {
+  // R7. The shared header now carries more on admin routes than it used to.
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/admin");
+
+  const overflows = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth >
+      document.documentElement.clientWidth,
+  );
+  expect(overflows).toBe(false);
+});
+
+test("the maintainer strip follows the maintainer onto the public pages", async ({
+  page,
+}) => {
+  // R3, R6. The point of the whole hint-cookie arrangement: the maintainer
+  // gets their controls on the page they are already looking at, and the page
+  // is still the statically rendered one every visitor gets.
   await page.goto("/");
-  await page.getByRole("link", { name: "Maintainer", exact: true }).click();
+  const eventHref = await page
+    .locator("article h3 a")
+    .first()
+    .getAttribute("href");
+  expect(eventHref).toBeTruthy();
+
+  for (const path of ["/", "/calendar", "/projects", eventHref!, "/admin"]) {
+    await page.goto(path);
+
+    await expect(
+      page.getByText("Maintainer view"),
+      `no maintainer strip on ${path}`,
+    ).toBeVisible();
+
+    for (const name of MAINTAINER_ACTIONS) {
+      await expect(adminStrip(page).getByRole("link", { name })).toBeVisible();
+    }
+    await expect(
+      adminStrip(page).getByRole("button", { name: "Sign out" }),
+    ).toBeVisible();
+  }
+});
+
+test("the maintainer is not offered the door to the room they are in", async ({
+  page,
+}) => {
+  // The strip has replaced the "Maintainer" link, rather than sitting beside
+  // it. Asserted on both a public route, where the swap happens in the
+  // browser, and an admin route, where it happens on the server.
+  for (const path of ["/", "/admin"]) {
+    await page.goto(path);
+
+    await expect(page.getByText("Maintainer view")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Maintainer", exact: true }),
+      `the maintainer door is still showing on ${path}`,
+    ).toHaveCount(0);
+  }
+});
+
+test("the maintainer strip fits a narrow phone", async ({ page }) => {
+  // R7. The strip is the widest thing either header carries.
+  await page.setViewportSize({ width: 320, height: 800 });
+
+  for (const path of ["/", "/admin"]) {
+    await page.goto(path);
+    await expect(page.getByText("Maintainer view")).toBeVisible();
+
+    const overflows = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    );
+    expect(overflows, `${path} scrolls sideways at 320px`).toBe(false);
+  }
+});
+
+test("the queue link counts what is actually waiting", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  // R6. The count is the reason the summary request exists at all, so it has
+  // to track reality rather than a number fixed at build time.
+  const queueLink = () => adminStrip(page).getByRole("link", { name: /^Queue/ });
+
+  /*
+   * Waits for the summary to land before reading the badge. Without this the
+   * pre-fetch label ("Queue", no number) is indistinguishable from a real
+   * count of zero, and the test would pass while measuring nothing.
+   */
+  async function loadAndCount(): Promise<number> {
+    const [response] = await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/admin/summary")),
+      page.goto("/"),
+    ]);
+    expect(response.status()).toBe(200);
+
+    const text = (await queueLink().textContent()) ?? "";
+    return Number(text.match(/\((\d+)\)/)?.[1] ?? 0);
+  }
+
+  const before = await loadAndCount();
+
+  const stranger = await browser.newContext({
+    baseURL,
+    storageState: { cookies: [], origins: [] },
+  });
+  const visitor = await stranger.newPage();
+  await visitor.goto("/submit");
+  await visitor.getByLabel(/What is it/).fill(`Queue counter ${Date.now()}`);
+  await visitor.getByLabel(/When/).fill(soon(20));
+  await visitor.getByRole("button", { name: "Send it in" }).click();
+  await expect(visitor.getByRole("status")).toContainText("Thank you");
+  await stranger.close();
+
+  await page.goto("/");
+  await expect(queueLink()).toHaveText(`Queue (${before + 1})`);
+});
+
+test("the same /admin href serves the maintainer and the visitor", async ({
+  page,
+}) => {
+  // One static href, two outcomes by session, decided by the dashboard guard
+  // rather than by anything the public layout knows. That delegation is what
+  // buys a session-free public layout, so the maintainer's half is asserted
+  // here and the visitor's half below, in the signed-out block.
+  //
+  // The maintainer reaches it through the strip: the "Maintainer" link is for
+  // people who are not signed in, and it has been replaced for those who are.
+  await page.goto("/");
+  await adminStrip(page)
+    .getByRole("link", { name: "Confirmation pass" })
+    .click();
 
   await expect(page).toHaveURL("/admin");
   await expect(
@@ -82,15 +261,168 @@ test.describe("as a signed-out visitor", () => {
     }
   });
 
-  test("exposes no authoring or confirmation control", async ({ page }) => {
-    for (const path of ["/", "/calendar"]) {
+  /*
+   * The load-bearing test in this repo.
+   *
+   * Until maintainer controls existed on public pages this passed trivially.
+   * It now stands between a visitor and every affordance the maintainer has,
+   * and the thing it is really guarding is a design that is easy to undo by
+   * accident: the controls are absent because a cookie check said so in the
+   * browser, not because a server refused anyone. Anyone who swaps that check
+   * for something that "just renders it and lets the routes reject" breaks R1
+   * without breaking anything that looks broken.
+   *
+   * Assertions count elements rather than checking visibility on purpose.
+   * Absent and hidden are different things, and only one of them is the
+   * promise being made here.
+   */
+
+  /** Every public surface, including one of each kind of detail page. */
+  async function everyPublicSurface(page: Page): Promise<string[]> {
+    await page.goto("/");
+    const event = await page.locator("article h3 a").first().getAttribute("href");
+
+    await page.goto("/projects");
+    const project = await page
+      .locator("article h3 a")
+      .first()
+      .getAttribute("href");
+
+    // A silent empty list here would quietly reduce this suite to testing
+    // four pages instead of six.
+    expect(event, "no published event to check an event page against").toBeTruthy();
+    expect(project, "no project to check a project page against").toBeTruthy();
+
+    return ["/", "/calendar", "/projects", "/submit", event!, project!];
+  }
+
+  test("exposes no authoring or confirmation control anywhere", async ({
+    page,
+  }) => {
+    for (const path of await everyPublicSurface(page)) {
       await page.goto(path);
 
-      await expect(page.getByRole("button", { name: /Confirm/ })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: /Publish/ })).toHaveCount(0);
-      await expect(page.getByRole("link", { name: /^Edit/ })).toHaveCount(0);
-      await expect(page.locator('input[type="checkbox"]')).toHaveCount(0);
+      const where = `on ${path}`;
+      await expect(
+        page.getByRole("button", { name: /Confirm/ }),
+        where,
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: /Publish/ }),
+        where,
+      ).toHaveCount(0);
+      await expect(page.getByRole("link", { name: /^Edit/ }), where).toHaveCount(
+        0,
+      );
+      await expect(
+        page.getByRole("link", { name: /^Add (project|event)$/ }),
+        where,
+      ).toHaveCount(0);
+      await expect(page.locator('input[type="checkbox"]'), where).toHaveCount(0);
+
+      // The strip, its label, and the admin routes it links to.
+      await expect(page.getByText("Maintainer view"), where).toHaveCount(0);
+      await expect(adminStrip(page), where).toHaveCount(0);
+      await expect(page.locator('a[href^="/admin/"]'), where).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Sign out" }),
+        where,
+      ).toHaveCount(0);
     }
+  });
+
+  test("issues no admin requests at all", async ({ page }) => {
+    /*
+     * R9, and the assertion most likely to rot silently. Everything else here
+     * would keep passing if someone replaced the hint-cookie check with
+     * useSession() — the controls would still be absent, because the session
+     * really is absent. What would change is that every visitor's page view
+     * started costing an auth API call, which is the cost this whole design
+     * exists to avoid and the one nobody would notice.
+     */
+    const adminRequests: string[] = [];
+    page.on("request", (request) => {
+      if (/\/api\/admin\//.test(request.url())) adminRequests.push(request.url());
+    });
+
+    for (const path of await everyPublicSurface(page)) {
+      await page.goto(path);
+      await page.waitForLoadState("load");
+
+      // Proving a negative needs a window to be negative in. The request this
+      // is watching for would be issued from an effect immediately after
+      // hydration, so a short settle after load is the whole opportunity it
+      // would ever have had.
+      await page.waitForTimeout(300);
+    }
+
+    expect(adminRequests).toEqual([]);
+  });
+
+  test("is still served from the prerender cache, not rendered per request", async ({
+    page,
+  }) => {
+    // R2. The observable proxy for "still statically prerendered": a page that
+    // had started reading a session would lose this header and pick up the
+    // no-store cache-control that every genuinely dynamic route carries.
+    for (const path of ["/", "/calendar", "/projects", "/submit"]) {
+      const response = await page.goto(path);
+      const headers = response!.headers();
+
+      // Presence is the signal, and the value is not always a bare "1" —
+      // Playwright joins the header when Next sends it more than once.
+      expect(
+        headers["x-nextjs-prerender"],
+        `${path} is no longer prerendered`,
+      ).toBeDefined();
+      expect(headers["cache-control"], `${path} is rendered per request`).toContain(
+        "s-maxage",
+      );
+      expect(headers["cache-control"]).not.toContain("no-store");
+      expect(headers["set-cookie"] ?? "").not.toContain("better-auth");
+    }
+  });
+
+  test("a forged hint cookie opens nothing", async ({ browser, baseURL }) => {
+    /*
+     * R8, stated as an attack rather than as a property.
+     *
+     * The hint cookie is not httpOnly and is trivially forged, which is fine
+     * and is the whole design — but only for as long as it stays a rendering
+     * hint. Someone who sets it should see chrome briefly, be told by the
+     * server that they are nobody, and be left with a visitor's page and no
+     * cookie.
+     */
+    const context = await browser.newContext({
+      baseURL,
+      storageState: { cookies: [], origins: [] },
+    });
+    await context.addCookies([
+      { name: ADMIN_HINT_COOKIE, value: "1", url: baseURL! },
+    ]);
+    const page = await context.newPage();
+
+    const [summary] = await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/admin/summary")),
+      page.goto("/"),
+    ]);
+
+    // The one request the forged cookie buys, and the answer it gets.
+    expect(summary.status()).toBe(401);
+
+    await expect(page.getByText("Maintainer view")).toHaveCount(0);
+    expect(
+      (await context.cookies()).some((c) => c.name === ADMIN_HINT_COOKIE),
+      "the server should have expired the forged hint",
+    ).toBe(false);
+
+    // And the routes it would have linked to are no more open than before.
+    for (const path of ["/admin", "/admin/events/new", "/admin/queue"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/admin\/login/);
+    }
+
+    await context.close();
   });
 
   test("every public page offers the maintainer entry point", async ({ page }) => {
@@ -136,24 +468,67 @@ test.describe("as a signed-out visitor", () => {
     await expect(page.getByRole("heading", { name: /What.s on/ })).toBeVisible();
   });
 
+  test("the header marks the page you are on and only that page", async ({
+    page,
+  }) => {
+    // R7. The active marker arrives at hydration; what it must never do is
+    // claim two pages at once.
+    await page.goto("/calendar");
+
+    await expect(
+      siteNav(page).getByRole("link", { name: "Calendar", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+
+    await expect(
+      siteNav(page).locator('[aria-current="page"]'),
+    ).toHaveCount(1);
+  });
+
+  test("the header reads without JavaScript, minus the active marker", async ({
+    browser,
+    baseURL,
+  }) => {
+    // The nav is server-rendered markup; only NavLink's current-page marker
+    // needs the client. Every destination has to stay reachable without it.
+    const context = await browser.newContext({
+      baseURL,
+      javaScriptEnabled: false,
+      storageState: { cookies: [], origins: [] },
+    });
+    const page = await context.newPage();
+    await page.goto("/calendar");
+
+    for (const name of VISITOR_NAV) {
+      await expect(siteNav(page).getByRole("link", { name })).toBeVisible();
+    }
+    await expect(
+      siteNav(page).getByRole("link", { name: "Maintainer", exact: true }),
+    ).toBeVisible();
+
+    await context.close();
+  });
+
   test("the header wraps rather than overflowing on a narrow phone", async ({
     page,
   }) => {
     // R7. 320px is the narrowest phone still in use, and the fifth nav item
     // is what pushed the existing row past it.
     await page.setViewportSize({ width: 320, height: 800 });
-    await page.goto("/");
 
-    await expect(
-      page.getByRole("link", { name: "Maintainer", exact: true }),
-    ).toBeVisible();
+    for (const path of ["/", "/calendar", "/projects"]) {
+      await page.goto(path);
 
-    const overflows = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth >
-        document.documentElement.clientWidth,
-    );
-    expect(overflows).toBe(false);
+      await expect(
+        page.getByRole("link", { name: "Maintainer", exact: true }),
+      ).toBeVisible();
+
+      const overflows = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      );
+      expect(overflows).toBe(false);
+    }
   });
 
   test("the forward calendar shows more than the landing page", async ({ page }) => {
